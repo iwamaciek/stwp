@@ -1,2 +1,8 @@
 # meteoapp-data
-Tutaj będziemy dodawać wszystko związane z danymi do naszego projektu.
+
+### Install prerequisites:
+```shell
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```

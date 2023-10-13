@@ -1,1 +1,8 @@
 cdsapi
+jupyterlab
+matplotlib
+xarray
+cfgrib
+eccodes
+ecmwflibs
+cartopy

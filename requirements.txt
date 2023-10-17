@@ -7,3 +7,5 @@ eccodes
 ecmwflibs
 cartopy
 pre-commit
+torch
+torch_geometric

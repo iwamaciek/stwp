@@ -6,3 +6,4 @@ cfgrib
 eccodes
 ecmwflibs
 cartopy
+pre-commit

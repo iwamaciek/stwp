@@ -1,5 +1,5 @@
 cdsapi
-jupyterlab
+jupyterlab~=3.6.3
 matplotlib
 xarray
 cfgrib

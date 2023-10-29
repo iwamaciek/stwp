@@ -3,7 +3,7 @@ import cdsapi
 c = cdsapi.Client()
 
 c.retrieve(
-    "reanalysis-era5-single-levels",
+    "reanalysis-era5-land",
     {
         "product_type": "reanalysis",
         "format": "grib",

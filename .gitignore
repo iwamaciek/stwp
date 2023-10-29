@@ -1,4 +1,5 @@
 .ipynb_checkpoints
-data.grib
 venv
 *.idx
+*.mp4
+*.grib

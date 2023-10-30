@@ -7,5 +7,6 @@ eccodes
 ecmwflibs
 cartopy
 pre-commit
+scikit-learn
 torch
 torch_geometric

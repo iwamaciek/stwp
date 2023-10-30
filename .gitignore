@@ -4,3 +4,4 @@ venv
 *.mp4
 *.grib
 test.txt
+__pycache__

@@ -5,3 +5,4 @@ venv
 *.grib
 test.txt
 __pycache__
+.idea

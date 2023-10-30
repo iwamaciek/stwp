@@ -1,10 +1,9 @@
 import numpy as np
-import pandas as pd
 
 
 class DataProcessor:
     def __init__(self, data: np.array):
-        self.data = data
+        self.data = data - 273.15
         _, self.latitude, self.longitude = data.shape
 
     def flatten(self):
@@ -26,7 +25,8 @@ class DataProcessor:
         y = self.data[:, -1, :]
         return X, y
 
-    def train_test_split(self, X, y, train_percentage=0.8):
+    @staticmethod
+    def train_test_split(X, y, train_percentage=0.8):
         train_samples = int(train_percentage * len(X))
         X_train, X_test = X[:train_samples], X[train_samples:]
         y_train, y_test = y[:train_samples], y[train_samples:]

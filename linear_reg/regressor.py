@@ -8,14 +8,15 @@ FEATURES_LIST = ["Temperature", "Pressure"]
 
 class Regressor:
     def __init__(
-        self, data_shape: tuple, feature_list: list, regressor_type="linear_reg"
+        self, X_shape: tuple, fh: int, feature_list: list, regressor_type="linear_reg"
     ):
         if regressor_type == "linear_reg":
             self.model = LinearRegression()
         else:
             print("Not implemented")
 
-        _, self.input_state, self.latitude, self.longitude, self.features = data_shape
+        _, self.input_state, self.latitude, self.longitude, self.features = X_shape
+        self.fh = fh
         self.feature_list = feature_list
 
     def train(self, X_train, y_train):
@@ -24,6 +25,7 @@ class Regressor:
         )
         X = X.transpose((0, 2, 1))
         X = X.reshape(-1, self.input_state)
+        # y = y_train.reshape(-1, self.fh)
         y = y_train.reshape(-1, 1)
         self.model.fit(X, y)
 
@@ -49,13 +51,15 @@ class Regressor:
             y_test.reshape(-1, self.features), y_hat.reshape(-1, self.features)
         )
 
-        y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features))
+        y_hat = y_hat.reshape(
+            (-1, self.fh, self.latitude, self.longitude, self.features)
+        )
         y_test = y_test.reshape(y_hat.shape)
 
         for i in range(limit):
             y_test_sample = y_test[i].reshape(-1, self.features)
             y_hat_sample = y_hat[i].reshape(-1, self.features)
-            fig, ax = plt.subplots(self.features, 2, figsize=(8, 5))
+            fig, ax = plt.subplots(self.features, 2 * self.fh, figsize=(8, 5))
 
             for j in range(self.features):
                 y_test_sample_feature_j = y_test_sample[:, j]
@@ -67,13 +71,19 @@ class Regressor:
                 r2 = r2_score(y_test_sample_feature_j, y_hat_sample_feature_j)
 
                 if verbose:
-                    _ = ax[j, 0].imshow(y_hat[i, :, :, j], cmap=plt.cm.coolwarm)
-                    ax[j, 0].set_title(f"Predicted [{self.feature_list[j]}]")
-                    ax[j, 0].axis("off")
-                    actual = ax[j, 1].imshow(y_test[i, :, :, j], cmap=plt.cm.coolwarm)
-                    ax[j, 1].set_title(f"Actual [{self.feature_list[j]}]")
-                    ax[j, 1].axis("off")
-                    _ = fig.colorbar(actual, ax=ax[j, 1], fraction=0.1)
+                    for k in range(2 * self.fh):
+                        ts = k // 2
+                        if k % 2 == 0:
+                            title = rf"$X_{{{self.feature_list[j]},t+{ts}}}$"
+                            value = y_test[i, ts, :, :, j]
+                        else:
+                            title = rf"$\hat{{X}}_{{{self.feature_list[j]},t+{ts}}}$"
+                            value = y_hat[i, ts, :, :, j]
+                        _ = ax[j, k].imshow(value, cmap=plt.cm.coolwarm)
+                        ax[j, k].set_title(title)
+                        ax[j, k].axis("off")
+
+                        # _ = fig.colorbar(predicted, ax=ax[j, 1], fraction=0.15)
 
                 rmse, r2 = round(rmse, 3), round(r2, 3)
                 print(
@@ -92,3 +102,8 @@ class Regressor:
                 )
 
         return y_hat
+
+    def forecast(self):
+        # TODO - autoregressive approach such as:
+        #  X_hat_t+2 = model(X_hat_t+1, X_t)
+        pass

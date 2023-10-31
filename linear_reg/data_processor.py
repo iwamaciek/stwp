@@ -23,10 +23,10 @@ class DataProcessor:
             sequences[i] = self.data[i : i + sequence_length, :, :, :]
         self.data = sequences
 
-    def preprocess(self, sequence_length):
+    def preprocess(self, sequence_length, fh):
         self.create_autoregressive_sequences(sequence_length=sequence_length)
-        X = self.data[:, : sequence_length - 1, :, :, :]
-        y = self.data[:, -1, :, :, :]
+        X = self.data[:, : sequence_length - fh, :, :, :]
+        y = self.data[:, -fh:, :, :, :]
         return X, y
 
     @staticmethod

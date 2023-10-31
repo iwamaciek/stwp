@@ -52,12 +52,13 @@ class Regressor:
                 r2 = r2_score(y_test_sample_feature_j, y_hat_sample_feature_j)
 
                 if verbose:
-                    ax[j, 0].imshow(y_hat[i, :, :, j], cmap=plt.cm.coolwarm)
+                    predicted = ax[j, 0].imshow(y_hat[i, :, :, j], cmap=plt.cm.coolwarm)
                     ax[j, 0].set_title(f"Predicted [{self.feature_list[j]}]")
                     ax[j, 0].axis("off")
-                    ax[j, 1].imshow(y_test[i, :, :, j], cmap=plt.cm.coolwarm)
+                    actual = ax[j, 1].imshow(y_test[i, :, :, j], cmap=plt.cm.coolwarm)
                     ax[j, 1].set_title(f"Actual [{self.feature_list[j]}]")
                     ax[j, 1].axis("off")
+                    cbar = fig.colorbar(actual, ax=ax[j, 1], fraction=0.1)
 
                 rmse, r2 = round(rmse, 3), round(r2, 3)
                 print(

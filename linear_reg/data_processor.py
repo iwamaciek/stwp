@@ -3,7 +3,7 @@ import numpy as np
 
 class DataProcessor:
     def __init__(self, data: np.array):
-        self.data = data - 273.15
+        self.data = data
         self.samples, self.latitude, self.longitude, self.features = data.shape
 
     def flatten(self):

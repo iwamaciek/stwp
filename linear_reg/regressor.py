@@ -1,4 +1,4 @@
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,10 +8,16 @@ FEATURES_LIST = ["Temperature", "Pressure"]
 
 class Regressor:
     def __init__(
-        self, X_shape: tuple, fh: int, feature_list: list, regressor_type="linear_reg"
+        self, X_shape: tuple, fh: int, feature_list: list, regressor_type="linear"
     ):
-        if regressor_type == "linear_reg":
+        if regressor_type == "linear":
             self.model = LinearRegression()
+        elif regressor_type == "ridge":
+            self.model = Ridge()
+        elif regressor_type == "lasso":
+            self.model = Lasso()
+        elif regressor_type == "elastic_net":
+            self.model = ElasticNet()
         else:
             print("Not implemented")
 

@@ -31,7 +31,7 @@ class SimplePredictor():
             -1, self.input_state, self.longitude * self.latitude * self.features
         )
         X = X.transpose((0, 2, 1))
-        y_hat = X_test
+        y_hat = X_test[-1]
 
         rmse_features, r2_features = self.evaluate(y_test.reshape(-1, self.features), y_hat.reshape(-1, self.features))
         y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features))

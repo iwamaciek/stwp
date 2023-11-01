@@ -3,8 +3,6 @@ from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 import numpy as np
 
-FEATURES_LIST = ["Temperature", "Pressure"]
-
 
 class Regressor:
     def __init__(
@@ -32,7 +30,8 @@ class Regressor:
         X = X.transpose((0, 2, 1))
         X = X.reshape(-1, self.input_state)
         # y = y_train.reshape(-1, self.fh)
-        y = y_train.reshape(-1, 1)
+        y = y_train[:, 0, :, :, :]
+        y = y.reshape(-1, 1)
         self.model.fit(X, y)
 
     def evaluate(self, y_hat, y_test):
@@ -51,7 +50,11 @@ class Regressor:
         )
         X = X.transpose((0, 2, 1))
 
-        y_hat = self.model.predict(X.reshape(-1, self.input_state))
+        # TODO if self.fh > 1
+        if self.fh == 1:
+            y_hat = self.model.predict(X.reshape(-1, self.input_state))
+        else:
+            y_hat = self.predict_autoreg(X_test, y_test)
 
         rmse_features, r2_features = self.evaluate(
             y_test.reshape(-1, self.features), y_hat.reshape(-1, self.features)
@@ -65,7 +68,9 @@ class Regressor:
         for i in range(limit):
             y_test_sample = y_test[i].reshape(-1, self.features)
             y_hat_sample = y_hat[i].reshape(-1, self.features)
-            fig, ax = plt.subplots(self.features, 2 * self.fh, figsize=(8, 5))
+            fig, ax = plt.subplots(
+                self.features, 2 * self.fh, figsize=(8 * self.fh, 3 * self.features)
+            )
 
             for j in range(self.features):
                 y_test_sample_feature_j = y_test_sample[:, j]
@@ -80,10 +85,10 @@ class Regressor:
                     for k in range(2 * self.fh):
                         ts = k // 2
                         if k % 2 == 0:
-                            title = rf"$X_{{{self.feature_list[j]},t+{ts}}}$"
+                            title = rf"$X_{{{self.feature_list[j]},t+{ts+1}}}$"
                             value = y_test[i, ts, :, :, j]
                         else:
-                            title = rf"$\hat{{X}}_{{{self.feature_list[j]},t+{ts}}}$"
+                            title = rf"$\hat{{X}}_{{{self.feature_list[j]},t+{ts+1}}}$"
                             value = y_hat[i, ts, :, :, j]
                         _ = ax[j, k].imshow(value, cmap=plt.cm.coolwarm)
                         ax[j, k].set_title(title)
@@ -109,7 +114,28 @@ class Regressor:
 
         return y_hat
 
-    def forecast(self):
-        # TODO - autoregressive approach such as:
-        #  X_hat_t+2 = model(X_hat_t+1, X_t)
-        pass
+    def predict_autoreg(self, X_test, y_test):
+        # TODO describe it precisely and refactor code
+        y_hat = np.zeros(y_test.shape)
+        for i in range(X_test.shape[0]):
+            y_hat_i = np.zeros(y_test[i].shape)
+            X = X_test[i].reshape((1,) + X_test[i].shape)
+            X = X.reshape(
+                -1, self.input_state, self.longitude * self.latitude * self.features
+            )
+            X = X.transpose((0, 2, 1))
+            X = X.reshape(-1, self.input_state)
+            y_hat_i[0] = self.model.predict(X).reshape(y_test[i][0].shape)
+            for j in range(self.fh - 1):
+                X_autoreg = np.concatenate(
+                    (X_test[i, j + 1 :, :, :, :], y_hat_i[: j + 1]), axis=0
+                )
+                X_autoreg = X_autoreg.reshape(
+                    -1, self.input_state, self.longitude * self.latitude * self.features
+                )
+                X_autoreg = X_autoreg.transpose((0, 2, 1))
+                y_hat_i[j + 1] = self.model.predict(
+                    X_autoreg.reshape(-1, self.input_state)
+                ).reshape(X_test[i, j].shape)
+            y_hat[i] = y_hat_i
+        return y_hat

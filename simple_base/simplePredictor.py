@@ -6,15 +6,16 @@ class SimplePredictor():
     """
     A sofisticated predictor that predict the weather will stay the same
     """
-    def __init__(self, data_shape, feature_list):
+    def __init__(self, data_shape: tuple, feature_list: list):
         _, self.input_state, self.latitude, self.longitude, self.features = data_shape
         self.feature_list = feature_list
     
-    def predict(self, matrix):
+    def predict(self, X):
         """
         This sophisticated predition method predicts the weather will stay exactly the same as it is.
         """
-        return matrix
+        y_hat = X[:, -1, ...]
+        return y_hat
 
     def evaluate(self, y_hat, y_test):
         rmse_features, r2_features = [], []
@@ -27,11 +28,7 @@ class SimplePredictor():
         return rmse_features, r2_features
 
     def predict_and_evaluate(self, X_test, y_test, limit=5, verbose=True):
-        X = X_test.reshape(
-            -1, self.input_state, self.longitude * self.latitude * self.features
-        )
-        X = X.transpose((0, 2, 1))
-        y_hat = X_test[-1]
+        y_hat = self.predict(X_test)
 
         rmse_features, r2_features = self.evaluate(y_test.reshape(-1, self.features), y_hat.reshape(-1, self.features))
         y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features))

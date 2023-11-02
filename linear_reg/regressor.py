@@ -22,6 +22,7 @@ class Regressor:
         _, self.input_state, self.latitude, self.longitude, self.features = X_shape
         self.fh = fh
         self.feature_list = feature_list
+        # self.models = [self.model for _ in range(self.features)]
 
     def train(self, X_train, y_train):
         flatten_features = self.longitude * self.latitude * self.features

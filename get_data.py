@@ -8,8 +8,12 @@ c.retrieve(
         "product_type": "reanalysis",
         "format": "grib",
         "variable": [
+            "10m_u_component_of_wind",
+            "10m_v_component_of_wind",
             "2m_temperature",
             "surface_pressure",
+            "total_cloud_cover",
+            "total_precipitation",
         ],
         "year": "2023",
         "month": [
@@ -50,11 +54,9 @@ c.retrieve(
         ],
         "time": [
             "00:00",
-            "04:00",
-            "08:00",
+            "06:00",
             "12:00",
-            "16:00",
-            "20:00",
+            "18:00",
         ],
         "area": [
             55,
@@ -66,4 +68,4 @@ c.retrieve(
     "data.grib",
 )
 
-# ~ 30s
+# ~ 2min

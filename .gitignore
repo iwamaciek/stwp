@@ -6,3 +6,4 @@ venv
 test.txt
 __pycache__
 .idea
+emc.py

@@ -1,1 +1,13 @@
 cdsapi
+jupyterlab~=3.6.3
+matplotlib
+xarray
+cfgrib
+eccodes
+ecmwflibs
+cartopy
+numpy
+pre-commit
+scikit-learn
+torch
+torch_geometric

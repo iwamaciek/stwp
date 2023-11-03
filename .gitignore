@@ -1,1 +1,9 @@
-data.grib
+.ipynb_checkpoints
+venv
+*.idx
+*.mp4
+*.grib
+test.txt
+__pycache__
+.idea
+emc.py

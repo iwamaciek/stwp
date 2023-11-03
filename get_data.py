@@ -15,10 +15,20 @@ c.retrieve(
             "total_cloud_cover",
             "total_precipitation",
         ],
-        "year": "2023",
+        "year": "2022",
         "month": [
+            "01",
+            "02",
+            "03",
+            "04",
+            "05",
+            "06",
+            "07",
+            "08",
             "09",
             "10",
+            "11",
+            "12",
         ],
         "day": [
             "01",
@@ -65,7 +75,7 @@ c.retrieve(
             25,
         ],
     },
-    "data.grib",
+    "data2022.grib",
 )
 
-# ~ 2min
+# ~ 18min

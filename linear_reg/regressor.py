@@ -34,13 +34,13 @@ class Regressor:
             self.models[i].fit(Xi, yi)
 
     def evaluate(self, y_hat, y_test):
-        rmse_features, r2_features = [], []
+        rmse_features = []
         for i in range(self.features):
             y_hat_i = y_hat[:, :, :, :, i].flatten()
             y_test_i = y_test[:, :, :, :, i].flatten()
-            rmse_features.append(np.sqrt(mean_squared_error(y_hat_i, y_test_i)))
-            r2_features.append(r2_score(y_hat_i, y_test_i))
-        return rmse_features, r2_features
+            err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
+            rmse_features.append(err)
+        return rmse_features
 
     def predict_and_evaluate(self, X_test, y_test, max_samples=5):
         if self.fh == 1:
@@ -60,8 +60,7 @@ class Regressor:
         else:
             y_hat = self.predict_autoreg(X_test, y_test)
 
-        print(y_hat.shape, y_test.shape)
-        rmse_features, r2_features = self.evaluate(y_hat, y_test)
+        rmse_features = self.evaluate(y_hat, y_test)
 
         for i in range(max_samples):
             y_test_sample, y_hat_sample = y_test[i], y_hat[i]
@@ -77,9 +76,7 @@ class Regressor:
                     y_test_sample_feature_j, y_hat_sample_feature_j
                 )
                 rmse = np.sqrt(mse)
-                r2 = r2_score(y_test_sample_feature_j, y_hat_sample_feature_j)
-                rmse, r2 = round(rmse, 3), round(r2, 3)
-                print(f"RMSE {cur_feature}: {rmse}; R2 {cur_feature}: {r2}")
+                print(f"RMSE {cur_feature}: {round(rmse,3)}")
 
                 for k in range(2 * self.fh):
                     ts = k // 2
@@ -89,21 +86,19 @@ class Regressor:
                     else:
                         title = rf"$\hat{{X}}_{{{cur_feature},t+{ts+1}}}$"
                         value = y_hat[i, ts, :, :, j]
-                    _ = ax[j, k].imshow(value, cmap=plt.cm.coolwarm)
+                    pl = ax[j, k].imshow(value, cmap=plt.cm.coolwarm)
                     ax[j, k].set_title(title)
                     ax[j, k].axis("off")
-                    # _ = fig.colorbar(predicted, ax=ax[j, 1], fraction=0.15)
+                    _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
             plt.show()
 
         print("=======================================")
         print("Evaluation metrics for entire test set:")
         print("=======================================")
         for i in range(self.features):
-            print(
-                f"RMSE {self.feature_list[i]}: {rmse_features[i]}; R2 {self.feature_list[i]}: {r2_features[i]}"
-            )
+            print(f"RMSE {self.feature_list[i]}: {rmse_features[i]}")
 
-        return y_hat.reshape(-1, self.features), y_test.reshape(-1, self.features)
+        return y_hat
 
     def predict_autoreg(self, X_test, y_test):
         """

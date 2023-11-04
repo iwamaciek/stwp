@@ -68,12 +68,8 @@ class Regressor:
                         value = y_hat[i, :, :, ts, j]
                         cmap = plt.cm.coolwarm
                     else:
-                        title = (
-                            rf"$f_{{RMSE}}(X - \hat{{X}})_{{{cur_feature},t+{ts+1}}}$"
-                        )
-                        value = np.sqrt(
-                            (y_test[i, :, :, ts, j] - y_hat[i, :, :, ts, j]) ** 2
-                        )
+                        title = rf"$(X - \hat{{X}})_{{{cur_feature},t+{ts+1}}}$"
+                        value = y_test[i, :, :, ts, j] - y_hat[i, :, :, ts, j]
                         cmap = "binary"
                     pl = ax[j, k].imshow(value, cmap=cmap)
                     ax[j, k].set_title(title)

@@ -25,13 +25,12 @@ class Regressor:
         self.models = [self.model for _ in range(self.features)]
 
     def train(self, X_train, y_train):
+        flatten_features = self.longitude * self.latitude * self.features
+        X = X_train.reshape(-1, self.input_state, flatten_features)
+        X = X.transpose((0, 2, 1)).reshape(-1, self.input_state * self.features)
         for i in range(self.features):
-            Xi = X_train[:, :, :, :, i].reshape(
-                -1, self.input_state, self.latitude * self.longitude
-            )
-            Xi = Xi.transpose((0, 2, 1)).reshape(-1, self.input_state)
             yi = y_train[:, 0, :, :, i].reshape(-1, 1)
-            self.models[i].fit(Xi, yi)
+            self.models[i].fit(X, yi)
 
     def evaluate(self, y_hat, y_test):
         rmse_features = []
@@ -43,16 +42,14 @@ class Regressor:
         return rmse_features
 
     def predict_and_evaluate(self, X_test, y_test, max_samples=5):
+        flatten_features = self.longitude * self.latitude * self.features
+        X = X_test.reshape(-1, self.input_state, flatten_features).transpose((0, 2, 1))
         if self.fh == 1:
             y_hat = []
             for i in range(self.features):
-                Xi = X_test[:, :, :, :, i].reshape(
-                    -1, self.input_state, self.latitude * self.longitude
-                )
-                Xi = Xi.transpose((0, 2, 1)).reshape(-1, self.input_state)
                 y_hat_i = (
                     self.models[i]
-                    .predict(Xi)
+                    .predict(X.reshape(-1, self.input_state * self.features))
                     .reshape(-1, self.fh, self.latitude, self.longitude)
                 )
                 y_hat.append(y_hat_i)

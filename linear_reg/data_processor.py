@@ -21,12 +21,13 @@ class DataProcessor:
         )
         for i in range(self.samples - sequence_length + 1):
             sequences[i] = self.data[i : i + sequence_length, :, :, :]
+        sequences = sequences.transpose((0, 2, 3, 1, 4))
         self.data = sequences
 
     def preprocess(self, input_size, fh=1):
         self.create_autoregressive_sequences(sequence_length=input_size + fh)
-        X = self.data[:, :input_size, :, :, :]
-        y = self.data[:, -fh:, :, :, :]
+        X = self.data[:, :, :, :input_size, :]
+        y = self.data[:, :, :, -fh:, :]
         return X, y
 
     @staticmethod

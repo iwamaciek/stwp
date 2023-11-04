@@ -20,13 +20,20 @@ class Regressor:
         else:
             print("Not implemented")
 
-        _, self.latitude, self.longitude, self.input_state, self.features = X_shape
+        (
+            _,
+            self.latitude,
+            self.longitude,
+            self.neighbours,
+            self.input_state,
+            self.features,
+        ) = X_shape
         self.fh = fh
         self.feature_list = feature_list
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
 
     def train(self, X_train, y_train):
-        X = X_train.reshape(-1, self.input_state * self.features)
+        X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
         for i in range(self.features):
             yi = y_train[:, :, :, 0, i].reshape(-1, 1)
             self.models[i].fit(X, yi)
@@ -78,7 +85,7 @@ class Regressor:
             plt.show()
 
     def predict_and_evaluate(self, X_test, y_test, max_samples=5):
-        X = X_test.reshape(-1, self.input_state * self.features)
+        X = X_test.reshape(-1, self.neighbours * self.input_state * self.features)
         if self.fh == 1:
             y_hat = []
             for i in range(self.features):

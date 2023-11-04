@@ -1,5 +1,5 @@
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
@@ -20,14 +20,25 @@ class Regressor:
         else:
             print("Not implemented")
 
-        (
-            _,
-            self.latitude,
-            self.longitude,
-            self.neighbours,
-            self.input_state,
-            self.features,
-        ) = X_shape
+        if len(X_shape) > 5:
+            (
+                _,
+                self.latitude,
+                self.longitude,
+                self.neighbours,
+                self.input_state,
+                self.features,
+            ) = X_shape
+        else:
+            (
+                _,
+                self.latitude,
+                self.longitude,
+                self.input_state,
+                self.features,
+            ) = X_shape
+            self.neighbours = 1
+
         self.fh = fh
         self.feature_list = feature_list
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
@@ -35,14 +46,14 @@ class Regressor:
     def train(self, X_train, y_train):
         X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
         for i in range(self.features):
-            yi = y_train[:, :, :, 0, i].reshape(-1, 1)
+            yi = y_train[..., 0, i].reshape(-1, 1)
             self.models[i].fit(X, yi)
 
     def evaluate(self, y_hat, y_test):
         rmse_features = []
         for i in range(self.features):
-            y_hat_i = y_hat[:, :, :, :, i].reshape(-1, 1)
-            y_test_i = y_test[:, :, :, :, i].reshape(-1, 1)
+            y_hat_i = y_hat[..., i].reshape(-1, 1)
+            y_test_i = y_test[..., i].reshape(-1, 1)
             err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
             rmse_features.append(err)
         return rmse_features
@@ -56,8 +67,8 @@ class Regressor:
 
             for j in range(self.features):
                 cur_feature = self.feature_list[j]
-                y_test_sample_feature_j = y_test_sample[:, :, :, j].reshape(-1, 1)
-                y_hat_sample_feature_j = y_hat_sample[:, :, :, j].reshape(-1, 1)
+                y_test_sample_feature_j = y_test_sample[..., j].reshape(-1, 1)
+                y_hat_sample_feature_j = y_hat_sample[..., j].reshape(-1, 1)
                 mse = mean_squared_error(
                     y_test_sample_feature_j, y_hat_sample_feature_j
                 )
@@ -75,8 +86,8 @@ class Regressor:
                         value = y_hat[i, :, :, ts, j]
                         cmap = plt.cm.coolwarm
                     else:
-                        title = rf"$(X - \hat{{X}})_{{{cur_feature},t+{ts+1}}}$"
-                        value = y_test[i, :, :, ts, j] - y_hat[i, :, :, ts, j]
+                        title = rf"$|X - \hat{{X}}|_{{{cur_feature},t+{ts+1}}}$"
+                        value = np.abs(y_test[i, ..., ts, j] - y_hat[i, ..., ts, j])
                         cmap = "binary"
                     pl = ax[j, k].imshow(value, cmap=cmap)
                     ax[j, k].set_title(title)

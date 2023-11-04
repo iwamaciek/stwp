@@ -22,7 +22,7 @@ class DataProcessor:
             )
         )
         for i in range(self.samples - sequence_length + 1):
-            sequences[i] = self.data[i : i + sequence_length, :, :, :]
+            sequences[i] = self.data[i : i + sequence_length]
         sequences = sequences.transpose((0, 2, 3, 1, 4))
         self.samples = sequences.shape[0]
         self.data = sequences
@@ -55,18 +55,16 @@ class DataProcessor:
                 self.features,
             )
         )
-        neigh_data[:, :, :, 0, :, :] = self.data
+        neigh_data[..., 0, :, :] = self.data
         for i in range(1, self.neighbours + 1):
             ii, ij = indices[i - 1]
             for j in range(self.samples):
                 for la in range(self.latitude):
                     for lo in range(self.longitude):
                         if 0 < la + ii < self.latitude and 0 < lo + ij < self.longitude:
-                            neigh_data[j, la, lo, i, :] = self.data[
-                                j, la + ii, lo + ij, :, :
-                            ]
+                            neigh_data[j, la, lo, i] = self.data[j, la + ii, lo + ij]
                         else:
-                            neigh_data[j, la, lo, i, :, :] = self.data[j, la, lo, :, :]
+                            neigh_data[j, la, lo, i] = self.data[j, la, lo]
 
         self.data = neigh_data
 
@@ -82,11 +80,14 @@ class DataProcessor:
         #
         # self.data = neigh_data
 
-    def preprocess(self, input_size, fh=1, r=1):
+    def preprocess(self, input_size, fh=1, r=1, use_neighbours=False):
         self.create_autoregressive_sequences(sequence_length=input_size + fh)
-        self.create_neighbours(radius=r)
-        X = self.data[:, :, :, :, :input_size, :]
-        y = self.data[:, :, :, 0, -fh:, :]
+        if use_neighbours:
+            self.create_neighbours(radius=r)
+            y = self.data[..., 0, -fh:, :]
+        else:
+            y = self.data[..., -fh:, :]
+        X = self.data[..., :input_size, :]
         return X, y
 
     @staticmethod

@@ -70,7 +70,7 @@ class Regressor:
             n = y_hat_i.shape[0]
             df = 10
             critical_value = t.ppf((1 + 0.95) / 2, df)
-        #     residual_variance = ...
+        #     residual_variance = (y_test_u - y_hat_i)**2
         # residuals = y_test - y_hat
         # rmse = np.sqrt(np.mean(residuals ** 2))
         # n, p = len(X), X.shape[1] (idk those supposted to be no. of predictors)
@@ -169,33 +169,22 @@ class Regressor:
         y_hat = np.empty(y_test.shape)
         num_samples = X_test.shape[0]
 
-        for i in range(num_samples):
-            Xi = X_test[i]
-            Yik = np.empty(Xi[..., 0, :].shape)
+        # X = (num_samples, latitude, longitude, neighbours, input_size, features)
+        # y = (num_samples, latitude, longitude, fh, features)
 
+        for i in range(num_samples):
             # TODO
             # if self.neighbours > 1: we need to run method similar to:
             # data_processor.get_neighbours (for Yik) - it might be computationally expensive
             # more efficient implementation would be very useful
-
-            for j in range(self.features):
-                Yik[..., j] = (
-                    self.models[j]
-                    .predict(
-                        Xi.reshape(
-                            -1, self.neighbours * self.input_state * self.features
-                        )
+            Xi = X_test[i]
+            for k in range(-1, self.fh - 1):
+                Yik = np.empty(Xi[..., 0, :].shape)
+                Xik = Xi
+                if k > -1:
+                    Xik = np.concatenate(
+                        (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
                     )
-                    .reshape(1, self.latitude, self.longitude)
-                )
-
-            y_hat[i, ..., 0, :] = Yik
-
-            for k in range(self.fh - 1):
-                Yik = np.empty(Yik.shape)
-                Xik = np.concatenate(
-                    (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
-                )
                 for j in range(self.features):
                     Yik[..., j] = (
                         self.models[j]
@@ -206,7 +195,6 @@ class Regressor:
                         )
                         .reshape(1, self.latitude, self.longitude)
                     )
-
                 y_hat[i, ..., k + 1, :] = Yik
 
         return y_hat

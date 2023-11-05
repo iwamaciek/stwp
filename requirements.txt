@@ -9,5 +9,6 @@ cartopy
 numpy
 pre-commit
 scikit-learn
+scipy
 torch
 torch_geometric

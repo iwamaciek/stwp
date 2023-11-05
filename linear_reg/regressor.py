@@ -1,5 +1,6 @@
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.metrics import mean_squared_error
+from scipy.stats import t
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
@@ -49,7 +50,7 @@ class Regressor:
             yi = y_train[..., 0, i].reshape(-1, 1)
             self.models[i].fit(X, yi)
 
-    def evaluate(self, y_hat, y_test):
+    def get_rmse(self, y_hat, y_test):
         rmse_features = []
         for i in range(self.features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
@@ -57,6 +58,44 @@ class Regressor:
             err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
             rmse_features.append(err)
         return rmse_features
+
+    def get_pred_intervals(self, X, y_hat, y_test):
+        # TODO
+        """
+        https://stats.stackexchange.com/questions/16493/difference-between-confidence-intervals-and-prediction-intervals/16496#16496
+        """
+        for i in range(self.features):
+            y_hat_i = y_hat[..., i].reshape(-1, 1)
+            y_test_i = y_test[..., i].reshape(-1, 1)
+            n = y_hat_i.shape[0]
+            df = 10
+            critical_value = t.ppf((1 + 0.95) / 2, df)
+        #     residual_variance =
+        # y_test, y_hat, y_forecast = np.array(y_test), np.array(y_hat), np.array(y_forecast)
+        # X_test, X_forecast = X_test_forecast[:-FORECASTING_HORIZON], X_test_forecast[-FORECASTING_HORIZON:]
+        # residuals = y_test - y_hat
+        # rmse = np.sqrt(np.mean(residuals ** 2))
+        # n, p = len(X_test), X_test.shape[1]
+        # if n - 1 < p:
+        #     degrees_of_freedom = n - 1
+        # else:
+        #     degrees_of_freedom = n - p - 1
+        # critical_value = t.ppf((1 + CONFIDENCE_LVL) / 2, degrees_of_freedom)
+        # intervals = []
+        #
+        # for x0, y0 in zip(np.array(X_forecast), y_forecast):
+        #     uncertainty_factor = rmse * np.sqrt(
+        #         1 + np.dot(x0, np.dot(np.linalg.inv(np.dot(X_test.T, X_test)), x0))
+        #     )
+        #
+        #     lower_bound = max(0, y0 - critical_value * uncertainty_factor)
+        #     upper_bound = y0 + critical_value * uncertainty_factor
+        #     intervals.append((lower_bound, upper_bound))
+
+        # return zip(*intervals)
+
+    def evaluate(self, y_hat, y_test):
+        return self.get_rmse(y_hat, y_test)
 
     def plot_predictions(self, y_hat, y_test, max_samples):
         for i in range(max_samples):
@@ -135,31 +174,53 @@ class Regressor:
         (Xi+k-1, ..., Yi+n+k-2 ,Yi+n+k-1) -> Yi+n+k
 
         """
-        y_hat = np.zeros(y_test.shape)
+        y_hat = np.empty(y_test.shape)
         num_samples = X_test.shape[0]
 
         for i in range(num_samples):
             Xi = X_test[i]
+            if self.neighbours > 1:
+                Yik = np.empty(Xi[..., 0, 0, :].shape)
+            else:
+                Yik = np.empty(Xi[..., 0, :].shape)
+
             for j in range(self.features):
-                y_hat_ij = np.zeros(y_test[i].shape[:-1])
-                # print(y_hat_ij.shape)
-                Xij = Xi.reshape(-1, self.input_state * self.features)
-                y_hat_ij[:, :, 0] = (
+                y_hat_j = (
                     self.models[j]
-                    .predict(Xij)
+                    .predict(
+                        Xi.reshape(
+                            -1, self.neighbours * self.input_state * self.features
+                        )
+                    )
                     .reshape(1, self.latitude, self.longitude)
                 )
-                for k in range(self.fh - 1):
-                    # TODO fix concatenation, is it even possible for distinct models?
-                    Xij = np.concatenate(
-                        (Xi[:, :, k + 1 :, :], y_hat_ij[:, :, : k + 1]), axis=0
+                Yik[..., j] = y_hat_j
+
+            y_hat[i, ..., 0, :] = Yik
+
+            for k in range(self.fh - 1):
+                Yik = np.empty(Yik.shape)
+                if self.neighbours > 1:
+                    # TODO: Xik above, miss self.neighbours dimension
+                    Xik = np.concatenate(
+                        (Xi[..., 0, k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
                     )
-                    Xij = Xij.reshape(-1, self.input_state * self.features)
-                    y_hat_ij[:, :, k + 1] = (
+                else:
+                    Xik = np.concatenate(
+                        (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
+                    )
+                for j in range(self.features):
+                    y_hat_j = (
                         self.models[j]
-                        .predict(Xij)
+                        .predict(
+                            Xik.reshape(
+                                -1, self.neighbours * self.input_state * self.features
+                            )
+                        )
                         .reshape(1, self.latitude, self.longitude)
                     )
-                y_hat[i, :, :, :, j] = y_hat_ij
+                    Yik[..., j] = y_hat_j
+
+                y_hat[i, ..., k + 1, :] = Yik
 
         return y_hat

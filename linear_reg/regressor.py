@@ -70,29 +70,21 @@ class Regressor:
             n = y_hat_i.shape[0]
             df = 10
             critical_value = t.ppf((1 + 0.95) / 2, df)
-        #     residual_variance =
-        # y_test, y_hat, y_forecast = np.array(y_test), np.array(y_hat), np.array(y_forecast)
-        # X_test, X_forecast = X_test_forecast[:-FORECASTING_HORIZON], X_test_forecast[-FORECASTING_HORIZON:]
+        #     residual_variance = ...
         # residuals = y_test - y_hat
         # rmse = np.sqrt(np.mean(residuals ** 2))
-        # n, p = len(X_test), X_test.shape[1]
+        # n, p = len(X), X.shape[1] (idk those supposted to be no. of predictors)
         # if n - 1 < p:
         #     degrees_of_freedom = n - 1
         # else:
         #     degrees_of_freedom = n - p - 1
         # critical_value = t.ppf((1 + CONFIDENCE_LVL) / 2, degrees_of_freedom)
-        # intervals = []
         #
-        # for x0, y0 in zip(np.array(X_forecast), y_forecast):
+        # for x0, y0 in zip(np.array(X), y_hat):
         #     uncertainty_factor = rmse * np.sqrt(
         #         1 + np.dot(x0, np.dot(np.linalg.inv(np.dot(X_test.T, X_test)), x0))
         #     )
-        #
-        #     lower_bound = max(0, y0 - critical_value * uncertainty_factor)
-        #     upper_bound = y0 + critical_value * uncertainty_factor
-        #     intervals.append((lower_bound, upper_bound))
-
-        # return zip(*intervals)
+        #     y0 +- critical_value * uncertainty_factor
 
     def evaluate(self, y_hat, y_test):
         return self.get_rmse(y_hat, y_test)
@@ -118,11 +110,11 @@ class Regressor:
                     ts = k // 3
                     if k % 3 == 0:
                         title = rf"$X_{{{cur_feature},t+{ts+1}}}$"
-                        value = y_test[i, :, :, ts, j]
+                        value = y_test[i, ..., ts, j]
                         cmap = plt.cm.coolwarm
                     elif k % 3 == 1:
                         title = rf"$\hat{{X}}_{{{cur_feature},t+{ts+1}}}$"
-                        value = y_hat[i, :, :, ts, j]
+                        value = y_hat[i, ..., ts, j]
                         cmap = plt.cm.coolwarm
                     else:
                         title = rf"$|X - \hat{{X}}|_{{{cur_feature},t+{ts+1}}}$"
@@ -179,13 +171,15 @@ class Regressor:
 
         for i in range(num_samples):
             Xi = X_test[i]
-            if self.neighbours > 1:
-                Yik = np.empty(Xi[..., 0, 0, :].shape)
-            else:
-                Yik = np.empty(Xi[..., 0, :].shape)
+            Yik = np.empty(Xi[..., 0, :].shape)
+
+            # TODO
+            # if self.neighbours > 1: we need to run method similar to:
+            # data_processor.get_neighbours (for Yik) - it might be computationally expensive
+            # more efficient implementation would be very useful
 
             for j in range(self.features):
-                y_hat_j = (
+                Yik[..., j] = (
                     self.models[j]
                     .predict(
                         Xi.reshape(
@@ -194,23 +188,16 @@ class Regressor:
                     )
                     .reshape(1, self.latitude, self.longitude)
                 )
-                Yik[..., j] = y_hat_j
 
             y_hat[i, ..., 0, :] = Yik
 
             for k in range(self.fh - 1):
                 Yik = np.empty(Yik.shape)
-                if self.neighbours > 1:
-                    # TODO: Xik above, miss self.neighbours dimension
-                    Xik = np.concatenate(
-                        (Xi[..., 0, k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
-                    )
-                else:
-                    Xik = np.concatenate(
-                        (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
-                    )
+                Xik = np.concatenate(
+                    (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
+                )
                 for j in range(self.features):
-                    y_hat_j = (
+                    Yik[..., j] = (
                         self.models[j]
                         .predict(
                             Xik.reshape(
@@ -219,7 +206,6 @@ class Regressor:
                         )
                         .reshape(1, self.latitude, self.longitude)
                     )
-                    Yik[..., j] = y_hat_j
 
                 y_hat[i, ..., k + 1, :] = Yik
 

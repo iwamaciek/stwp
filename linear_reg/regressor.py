@@ -104,7 +104,9 @@ class Regressor:
                     y_test_sample_feature_j, y_hat_sample_feature_j
                 )
                 rmse = np.sqrt(mse)
-                print(f"RMSE {cur_feature}: {round(rmse,5)}")
+                std = np.std(y_test_sample_feature_j)
+                sqrt_n = np.sqrt(y_test_sample_feature_j.shape[0])
+                print(f"{cur_feature} => RMSE:  {round(rmse,5)}; SE: {std / sqrt_n}")
 
                 for k in range(3 * self.fh):
                     ts = k // 3
@@ -146,8 +148,12 @@ class Regressor:
         print("=======================================")
         print("Evaluation metrics for entire test set:")
         print("=======================================")
+
+        sqrt_n = np.sqrt(y_test.shape[0] * self.latitude * self.longitude * self.fh)
         for i in range(self.features):
-            print(f"RMSE {self.feature_list[i]}: {eval_scores[i]}")
+            print(
+                f"{self.feature_list[i]} => RMSE: {eval_scores[i]}; SE: {np.std(y_test[...,i]) / sqrt_n}"
+            )
 
         return y_hat
 

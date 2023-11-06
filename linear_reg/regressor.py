@@ -128,7 +128,7 @@ class Regressor:
                     _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
             plt.show()
 
-    def predict_and_evaluate(self, X_test, y_test, max_samples=5):
+    def predict_(self, X_test, y_test):
         X = X_test.reshape(-1, self.neighbours * self.input_state * self.features)
         if self.fh == 1:
             y_hat = []
@@ -142,9 +142,13 @@ class Regressor:
             y_hat = np.array(y_hat).transpose((1, 2, 3, 4, 0))
         else:
             y_hat = self.predict_autoreg(X_test, y_test)
+        return y_hat
 
+    def predict_and_evaluate(self, X_test, y_test, max_samples=5):
+        y_hat = self.predict_(X_test, y_test)
         self.plot_predictions(y_hat, y_test, max_samples=max_samples)
         eval_scores = self.evaluate(y_hat, y_test)
+        # TODO eval_score for t2m look kinda suspicious
         print("=======================================")
         print("Evaluation metrics for entire test set:")
         print("=======================================")

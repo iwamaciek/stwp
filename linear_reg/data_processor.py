@@ -56,29 +56,23 @@ class DataProcessor:
             )
         )
         neigh_data[..., 0, :, :] = self.data
-        for i in range(1, self.neighbours + 1):
-            ii, ij = indices[i - 1]
-            for j in range(self.samples):
+
+        for n in range(1, self.neighbours + 1):
+            i, j = indices[n - 1]
+            for s in range(self.samples):
                 for la in range(self.latitude):
                     for lo in range(self.longitude):
-                        if 0 < la + ii < self.latitude and 0 < lo + ij < self.longitude:
-                            neigh_data[j, la, lo, i] = self.data[j, la + ii, lo + ij]
+                        if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                            neigh_data[s, la, lo, n] = self.data[s, la + i, lo + j]
                         else:
-                            neigh_data[j, la, lo, i] = self.data[j, la, lo]
+                            neigh_data[s, la, lo, n] = self.data[s, la, lo]
 
         self.data = neigh_data
-
         # TODO make it more efficient:
-        # neigh_data[:, :, :, 0, :, :] = self.data
-        #
-        # for i in range(1, self.neighbours + 1):
-        #     ii, ij = indices[i - 1]
-        #     shifted_data = np.roll(self.data, (0, ii, ij, 0, 0), axis=(0, 1, 2, 3, 4))
-        #     mask = (ii > 0) & (ii < self.latitude) & (ij > 0) & (ij < self.longitude)
-        #     mask = mask[..., np.newaxis, np.newaxis]
-        #     neigh_data[:, :, :, i, :, :] = shifted_data * mask
-        #
-        # self.data = neigh_data
+        # shifted_data = np.roll(self.data, (0, ii, ij, 0, 0), axis=(0, 1, 2, 3, 4))
+        # mask = (ii > 0) & (ii < self.latitude) & (ij > 0) & (ij < self.longitude)
+        # mask = mask[..., np.newaxis, np.newaxis]
+        # neigh_data[:, :, :, i, :, :] = shifted_data * mask
 
     def preprocess(self, input_size, fh=1, r=1, use_neighbours=False):
         self.create_autoregressive_sequences(sequence_length=input_size + fh)

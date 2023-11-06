@@ -1,6 +1,7 @@
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.metrics import mean_squared_error
 from scipy.stats import t
+from data_processor import DataProcessor
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
@@ -178,25 +179,25 @@ class Regressor:
         """
         y_hat = np.empty(y_test.shape)
         num_samples = X_test.shape[0]
-
-        # X = (num_samples, latitude, longitude, neighbours, input_size, features)
-        # y = (num_samples, latitude, longitude, fh, features)
-
         for i in range(num_samples):
-            # TODO
-            # if self.neighbours > 1: we need to run method similar to:
-            # data_processor.get_neighbours (for Yik) - it might be computationally expensive
-            # more efficient implementation would be very useful
             Xi = X_test[i]
+            Yik = np.empty(
+                (self.latitude, self.longitude, self.neighbours, self.fh, self.features)
+            )
             for k in range(-1, self.fh - 1):
-                Yik = np.empty(Xi[..., 0, :].shape)
                 Xik = Xi
                 if k > -1:
-                    Xik = np.concatenate(
-                        (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
-                    )
+                    if self.neighbours > 1:
+                        Yik[..., k, :] = self.extend(y_hat[i, ..., k : k + 1, :])
+                        Xik = np.concatenate(
+                            (Xi[..., k + 1 :, :], Yik[..., : k + 1, :]), axis=3
+                        )
+                    else:
+                        Xik = np.concatenate(
+                            (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
+                        )
                 for j in range(self.features):
-                    Yik[..., j] = (
+                    y_hat[i, ..., k + 1, j] = (
                         self.models[j]
                         .predict(
                             Xik.reshape(
@@ -205,6 +206,33 @@ class Regressor:
                         )
                         .reshape(1, self.latitude, self.longitude)
                     )
-                y_hat[i, ..., k + 1, :] = Yik
-
         return y_hat
+
+    def extend(self, Y):
+        """
+        Extend data sample such that it will use neighbours
+        shape: (latitude, longitude, neighbours, features)
+        It might be in data_processor
+        """
+        # TODO function that maps no. of neighbours -> radius
+        if self.neighbours <= 5:
+            radius = 1
+        elif self.neighbours <= 13:
+            radius = 2
+        # ...
+        else:
+            radius = 3
+
+        _, indices = DataProcessor.count_neighbours(radius=radius)
+        Y_out = np.empty(
+            (self.latitude, self.longitude, self.neighbours, self.features)
+        )
+        for n in range(self.neighbours):
+            i, j = indices[n - 1]
+            for lo in range(self.longitude):
+                for la in range(self.latitude):
+                    if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                        Y_out[la, lo, n] = Y[la + i, lo + j]
+                    else:
+                        Y_out[la, lo, n] = Y[la, lo]
+        return Y_out

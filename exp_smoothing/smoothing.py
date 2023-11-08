@@ -112,7 +112,7 @@ class SmoothingPredictor:
                         if self.type == "simple":
                             forecast = SimpleExpSmoothing(X[i, lat, lon, :, j], initialization_method="known", initial_level=self.params[j]["initial_level"]).fit(smoothing_level=self.params[j]["smoothing_level"]).forecast(self.fh)
                         elif self.type == "holt":
-                            forecast = Holt(X[i, lat, lon, :, j], initialization_method = "known", initial_level=self.params[j]["initial_level"], initial_trend=self.params[j]["initial_trend"]).fit(smoothing_level=self.params[j]["smoothing_level"], smoothing_trend=self.params[j]["smoothing_trend"]).forecast(self.longitude*self.latitude*self.fh)
+                            forecast = Holt(X[i, lat, lon, :, j], initialization_method = "known", initial_level=self.params[j]["initial_level"], initial_trend=self.params[j]["initial_trend"]).fit(smoothing_level=self.params[j]["smoothing_level"], smoothing_trend=self.params[j]["smoothing_trend"]).forecast(self.fh)
                         else: 
                             raise ValueError
                         ylon.append(forecast)

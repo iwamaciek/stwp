@@ -12,3 +12,4 @@ scikit-learn
 scipy
 torch
 torch_geometric
+statsmodels

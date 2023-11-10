@@ -1,17 +1,21 @@
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
-# from skleran.
-from scipy.stats import t
-from data_processor import DataProcessor
-import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
+from matplotlib import pyplot as plt
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
+from baselines.data_processor import DataProcessor
 
-class Regressor:
+
+class BaselineRegressor:
     def __init__(
-        self, X_shape: tuple, fh: int, feature_list: list, regressor_type="linear", alpha = 1
+        self,
+        X_shape: tuple,
+        fh: int,
+        feature_list: list,
+        regressor_type: str,
+        alpha: float,
     ):
         if regressor_type == "linear":
             self.model = LinearRegression()
@@ -23,6 +27,7 @@ class Regressor:
             self.model = ElasticNet(alpha=alpha)
         else:
             print("Not implemented")
+            raise ValueError
 
         if len(X_shape) > 5:
             (
@@ -46,30 +51,21 @@ class Regressor:
         self.fh = fh
         self.feature_list = feature_list
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
-        # self.feature_scaler = MinMaxScaler()
-        self.scaler_list = []
+        self.scalers = []
 
     def train(self, X_train, y_train):
         X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
         for i in range(self.features):
             yi = y_train[..., 0, i].reshape(-1, 1)
             self.models[i].fit(X, yi)
-            
-    
-    def train_and_scale(self, X_train, y_train):
-        
+
+    def normalized_train(self, X_train, y_train):
         X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
-
-        tmp = y_train[..., 0, 0].reshape(-1, 1)
-        # self.feature_scaler.fit(tmp)
-
         for i in range(self.features):
             scaler = MinMaxScaler()
-            
             yi = y_train[..., 0, i].reshape(-1, 1)
             scaler.fit(yi)
-            self.scaler_list.append(scaler)
-            # yi = self.feature_scaler.transform(yi)
+            self.scalers.append(scaler)
             self.models[i].fit(X, yi)
 
     def get_rmse(self, y_hat, y_test, normalize=False):
@@ -78,38 +74,11 @@ class Regressor:
             y_hat_i = y_hat[..., i].reshape(-1, 1)
             y_test_i = y_test[..., i].reshape(-1, 1)
             if normalize:
-                y_test_i = self.scaler_list[i].transform(y_test_i)
-                y_hat_i = self.scaler_list[i].transform(y_hat_i)
+                y_test_i = self.scalers[i].transform(y_test_i)
+                y_hat_i = self.scalers[i].transform(y_hat_i)
             err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
             rmse_features.append(err)
         return rmse_features
-
-    def get_pred_intervals(self, X, y_hat, y_test):
-        # TODO
-        """
-        https://stats.stackexchange.com/questions/16493/difference-between-confidence-intervals-and-prediction-intervals/16496#16496
-        """
-        for i in range(self.features):
-            y_hat_i = y_hat[..., i].reshape(-1, 1)
-            y_test_i = y_test[..., i].reshape(-1, 1)
-            n = y_hat_i.shape[0]
-            df = 10
-            critical_value = t.ppf((1 + 0.95) / 2, df)
-        #     residual_variance = (y_test_u - y_hat_i)**2
-        # residuals = y_test - y_hat
-        # rmse = np.sqrt(np.mean(residuals ** 2))
-        # n, p = len(X), X.shape[1] (idk those supposted to be no. of predictors)
-        # if n - 1 < p:
-        #     degrees_of_freedom = n - 1
-        # else:
-        #     degrees_of_freedom = n - p - 1
-        # critical_value = t.ppf((1 + CONFIDENCE_LVL) / 2, degrees_of_freedom)
-        #
-        # for x0, y0 in zip(np.array(X), y_hat):
-        #     uncertainty_factor = rmse * np.sqrt(
-        #         1 + np.dot(x0, np.dot(np.linalg.inv(np.dot(X_test.T, X_test)), x0))
-        #     )
-        #     y0 +- critical_value * uncertainty_factor
 
     def evaluate(self, y_hat, y_test):
         return self.get_rmse(y_hat, y_test)

@@ -1,11 +1,11 @@
+#!/usr/bin/env python3
 import numpy as np
 import copy
-
 from matplotlib import pyplot as plt
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.dummy import DummyRegressor
 from baselines.data_processor import DataProcessor
+from sklearn.preprocessing import FunctionTransformer
 
 
 class BaselineRegressor:
@@ -14,21 +14,7 @@ class BaselineRegressor:
         X_shape: tuple,
         fh: int,
         feature_list: list,
-        regressor_type: str,
-        alpha: float,
     ):
-        if regressor_type == "linear":
-            self.model = LinearRegression()
-        elif regressor_type == "ridge":
-            self.model = Ridge(alpha=alpha)
-        elif regressor_type == "lasso":
-            self.model = Lasso(alpha=alpha)
-        elif regressor_type == "elastic_net":
-            self.model = ElasticNet(alpha=alpha)
-        else:
-            print("Not implemented")
-            raise ValueError
-
         if len(X_shape) > 5:
             (
                 _,
@@ -50,22 +36,18 @@ class BaselineRegressor:
 
         self.fh = fh
         self.feature_list = feature_list
+
+        self.scaler = FunctionTransformer(lambda x: x)
+        self.model = DummyRegressor()
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
-        self.scalers = []
+        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
 
-    def train(self, X_train, y_train):
+    def train(self, X_train, y_train, normalized=False):
         X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
         for i in range(self.features):
             yi = y_train[..., 0, i].reshape(-1, 1)
-            self.models[i].fit(X, yi)
-
-    def normalized_train(self, X_train, y_train):
-        X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
-        for i in range(self.features):
-            scaler = MinMaxScaler()
-            yi = y_train[..., 0, i].reshape(-1, 1)
-            scaler.fit(yi)
-            self.scalers.append(scaler)
+            if normalized:
+                self.scalers[i].fit(X, yi)
             self.models[i].fit(X, yi)
 
     def get_rmse(self, y_hat, y_test, normalize=False):

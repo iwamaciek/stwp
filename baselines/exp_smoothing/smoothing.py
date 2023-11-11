@@ -15,25 +15,40 @@ class SmoothingPredictor(BaselineRegressor):
             print("Not implemented")
             raise ValueError
 
-        self.models = [None for _ in range(self.features)]
-        self.params = [None for _ in range(self.features)]
+        self.params = [0.4 if fname == "t2m" else (0.6 if fname == "tcc" else 0.8) for fname in self.feature_list]
 
     def train(self, X_train, y_train, normalized=False):
-        X = X_train.reshape(-1, self.features)
-        # print(X.shape)
-        for i in range(self.features):
-            if self.type == "simple":
-                self.models[i] = SimpleExpSmoothing(
-                    X[:, i], initialization_method="estimated"
-                ).fit()
-                self.params[i] = self.models[i].params_formatted["param"]
-            elif self.type == "holt":
-                self.models[i] = Holt(X[:, i], initialization_method="estimated").fit()
-                self.params[i] = self.models[i].params_formatted["param"]
-        print(self.params[0])
-        print()
+        print("Not needed")
+        raise KeyError
+        # X = X_train.reshape(-1, self.latitude * self.longitude, self.input_state, self.features)
+        # for feature in range(self.features):
+        #     init_levels = []
+        #     smoothing_levels = []
+        #     init_trends = []
+        #     smoothing_trends = []
+        #     for sample in range(X.shape[0]):
+        #         for grid in range(X.shape[1]):
+        #             if self.type == "simple":
+        #                 params = SimpleExpSmoothing(
+        #                     X[sample, grid, :, feature], initialization_method="estimated"
+        #                 ).fit().params_formatted["param"]
+        #                 init_levels.append(params["initial_level"])
+        #                 smoothing_levels.append(params["smoothing_level"])
+        #             elif self.type == "holt":
+        #                 params = Holt(X[sample, grid, :, feature], initialization_method="estimated").fit().params_formatted["param"]
+        #                 init_levels.append(params["initial_level"])
+        #                 init_trends.apped(params["initial_trend"])
+        #                 smoothing_levels.append(params["smoothing_level"])
+        #                 smoothing_trends.append(params["smoothing_trend"])
+        #             else:
+        #                 raise ValueError
+        #     if self.type == "simple":
+        #         self.params[feature] = {"initial_level": np.mean(np.array(init_levels)), "smoothing_level": np.mean(np.array(smoothing_levels))}
+        #     elif self.type == "holt":
+        #         self.params[feature] = {"initial_level": np.mean(np.array(init_levels)), "smoothing_level": np.mean(np.array(smoothing_levels)), "initial_trend": np.mean(np.array(init_trends)), "smoothing_trend": np.mean(np.array(smoothing_trends))}
+        #     print(self.feature_list[feature], self.params[feature])
 
-    def predict_(self, X_test, y_test):
+    def predict_(self, X_test, y_test, alpha):
         X = X_test.reshape(
             -1, self.latitude, self.longitude, self.input_state, self.features
         )
@@ -50,9 +65,12 @@ class SmoothingPredictor(BaselineRegressor):
                                 SimpleExpSmoothing(
                                     X[i, lat, lon, :, j],
                                     initialization_method="known",
-                                    initial_level=self.params[j]["initial_level"],
+                                    initial_level=X[i, lat, lon, 0, j],
                                 )
-                                .fit(smoothing_level=self.params[j]["smoothing_level"])
+                                .fit(
+                                    smoothing_level=self.params[j],
+                                    optimized=False
+                                )
                                 .forecast(self.fh)
                             )
                         elif self.type == "holt":
@@ -60,12 +78,13 @@ class SmoothingPredictor(BaselineRegressor):
                                 Holt(
                                     X[i, lat, lon, :, j],
                                     initialization_method="known",
-                                    initial_level=self.params[j]["initial_level"],
-                                    initial_trend=self.params[j]["initial_trend"],
+                                    initial_level=X[i, lat, lon, 0, j],
+                                    initial_trend=(X[i, lat, lon, -1, j]-X[i, lat, lon, 0, j])/self.input_state,
                                 )
                                 .fit(
-                                    smoothing_level=self.params[j]["smoothing_level"],
-                                    smoothing_trend=self.params[j]["smoothing_trend"],
+                                    smoothing_level=0.05,
+                                    smoothing_trend=(X[i, lat, lon, -1, j]-X[i, lat, lon, 0, j])/self.input_state,
+                                    optimized=False,
                                 )
                                 .forecast(self.fh)
                             )
@@ -75,8 +94,8 @@ class SmoothingPredictor(BaselineRegressor):
                     ylat.append(ylon)
                 y_hat_i.append(ylat)
             y_hat.append(y_hat_i)
-            if i % 50 == 0:
-                print(i, "/", X.shape[0])
+            # if i % 50 == 0:
+            #     print(i, "/", X.shape[0])
         y_hat = (
             np.array(y_hat)
             .reshape(

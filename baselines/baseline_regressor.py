@@ -42,12 +42,12 @@ class BaselineRegressor:
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
 
-    def train(self, X_train, y_train, normalized=False):
+    def train(self, X_train, y_train, normalize=False):
         X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
         for i in range(self.features):
             yi = y_train[..., 0, i].reshape(-1, 1)
-            if normalized:
-                self.scalers[i].fit(X, yi)
+            if normalize:
+                self.scalers[i].fit(yi)
             self.models[i].fit(X, yi)
 
     def get_rmse(self, y_hat, y_test, normalize=False):
@@ -124,7 +124,6 @@ class BaselineRegressor:
         y_hat = self.predict_(X_test, y_test)
         self.plot_predictions(y_hat, y_test, max_samples=max_samples)
         eval_scores = self.evaluate(y_hat, y_test)
-        # TODO eval_score for t2m look kinda suspicious
         print("=======================================")
         print("Evaluation metrics for entire test set:")
         print("=======================================")

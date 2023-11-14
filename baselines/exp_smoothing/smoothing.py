@@ -9,8 +9,11 @@ class SmoothingPredictor(BaselineRegressor):
         self, X_shape: tuple, fh: int, feature_list: list, smoothing_type="simple"
     ):
         super().__init__(X_shape, fh, feature_list)
-        if smoothing_type in ("simple", "holt"):
+        if smoothing_type == "simple":
             self.type = smoothing_type
+        elif smoothing_type in ("holt", "seasonal"):
+            print("WARNING: not used")
+            raise DeprecationWarning
         else:
             print("Not implemented")
             raise ValueError
@@ -20,33 +23,6 @@ class SmoothingPredictor(BaselineRegressor):
     def train(self, X_train, y_train, normalized=False):
         print("Not needed")
         raise KeyError
-        # X = X_train.reshape(-1, self.latitude * self.longitude, self.input_state, self.features)
-        # for feature in range(self.features):
-        #     init_levels = []
-        #     smoothing_levels = []
-        #     init_trends = []
-        #     smoothing_trends = []
-        #     for sample in range(X.shape[0]):
-        #         for grid in range(X.shape[1]):
-        #             if self.type == "simple":
-        #                 params = SimpleExpSmoothing(
-        #                     X[sample, grid, :, feature], initialization_method="estimated"
-        #                 ).fit().params_formatted["param"]
-        #                 init_levels.append(params["initial_level"])
-        #                 smoothing_levels.append(params["smoothing_level"])
-        #             elif self.type == "holt":
-        #                 params = Holt(X[sample, grid, :, feature], initialization_method="estimated").fit().params_formatted["param"]
-        #                 init_levels.append(params["initial_level"])
-        #                 init_trends.apped(params["initial_trend"])
-        #                 smoothing_levels.append(params["smoothing_level"])
-        #                 smoothing_trends.append(params["smoothing_trend"])
-        #             else:
-        #                 raise ValueError
-        #     if self.type == "simple":
-        #         self.params[feature] = {"initial_level": np.mean(np.array(init_levels)), "smoothing_level": np.mean(np.array(smoothing_levels))}
-        #     elif self.type == "holt":
-        #         self.params[feature] = {"initial_level": np.mean(np.array(init_levels)), "smoothing_level": np.mean(np.array(smoothing_levels)), "initial_trend": np.mean(np.array(init_trends)), "smoothing_trend": np.mean(np.array(smoothing_trends))}
-        #     print(self.feature_list[feature], self.params[feature])
 
     def predict_(self, X_test, y_test, alpha):
         X = X_test.reshape(
@@ -94,8 +70,6 @@ class SmoothingPredictor(BaselineRegressor):
                     ylat.append(ylon)
                 y_hat_i.append(ylat)
             y_hat.append(y_hat_i)
-            # if i % 50 == 0:
-            #     print(i, "/", X.shape[0])
         y_hat = (
             np.array(y_hat)
             .reshape(

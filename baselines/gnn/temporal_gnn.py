@@ -23,8 +23,9 @@ class TemporalGNN(torch.nn.Module):
         self.dropout = nn.Dropout(0.3)
         self.linear = torch.nn.Linear(hidden_dim, output_dim * input_dim)
 
-    def forward(self, x, edge_index):
-        h = self.tgnn(x, edge_index)
+    def forward(self, x, edge_index, edge_weights):
+        # h = self.tgnn(x, edge_index)
+        h = self.tgnn(x, edge_index, edge_weights)
         h = F.relu(h)
         h = self.batch_norm(h)
         h = self.dropout(h)
@@ -38,6 +39,7 @@ class Trainer:
         self.samples, self.latitude, self.longitude, self.features = self.shapes
         self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
         self.edge_index = self.dataset[0].edge_index
+        self.edge_weights = self.dataset[0].edge_attr
         self.train_size = int(self.samples * TRAIN_RATIO)
         self.test_size = self.samples - self.train_size
         self.train_data, self.test_data = (
@@ -64,7 +66,7 @@ class Trainer:
             total_loss = 0
             for batch in self.train_data[:subset]:
                 optimizer.zero_grad()
-                y_hat = self.model(batch.x, batch.edge_index)
+                y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
                 # loss = criterion(y_hat, batch.y)
                 loss = torch.sum((y_hat - batch.y) ** 2)
                 loss.backward()
@@ -79,7 +81,7 @@ class Trainer:
             with torch.no_grad():
                 val_loss = 0
                 for batch in self.test_data[:subset]:
-                    y_hat = self.model(batch.x, batch.edge_index)
+                    y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
                     # loss = criterion(y_hat, batch.y)
                     loss = torch.sum((y_hat - batch.y) ** 2)
                     val_loss += loss.item()
@@ -120,7 +122,7 @@ class Trainer:
         y = y.reshape((self.latitude, self.longitude, self.features, FH))
         y = y.cpu().detach().numpy()
 
-        y_hat = self.model(X, self.edge_index)
+        y_hat = self.model(X, self.edge_index, self.edge_weights)
         y_hat = y_hat.reshape((self.latitude, self.longitude, self.features, FH))
         y_hat = y_hat.cpu().detach().numpy()
 

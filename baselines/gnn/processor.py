@@ -4,7 +4,6 @@ import torch
 import torch_geometric.data as data
 import copy
 import sys
-from torch_geometric.utils import to_undirected
 from sklearn.preprocessing import MinMaxScaler
 from baselines.gnn.config import DEVICE, FH, INPUT_SIZE, TRAIN_RATIO, DATAPATH
 
@@ -70,32 +69,51 @@ def preprocess():
     def node_index(i, j, num_cols):
         return i * num_cols + j
 
+    B, A = num_longitudes, num_latitudes
     edge_index = []
-    for i in range(num_latitudes):
-        for j in range(num_longitudes):
+    edge_weights = []
+    for i in range(A):
+        for j in range(B):
             if i > 0:
                 edge_index.append(
                     [
-                        node_index(i, j, num_longitudes),
-                        node_index(i - 1, j, num_longitudes),
+                        node_index(i, j, B),
+                        node_index(i - 1, j, B),
                     ]
                 )
+                edge_index.append(
+                    [
+                        node_index(i - 1, j, B),
+                        node_index(i, j, B),
+                    ]
+                )
+                edge_weights.append(0.5)
+                edge_weights.append(-0.5)
+
             if j > 0:
                 edge_index.append(
                     [
-                        node_index(i, j, num_longitudes),
-                        node_index(i, j - 1, num_longitudes),
+                        node_index(i, j, B),
+                        node_index(i, j - 1, B),
                     ]
                 )
+                edge_index.append(
+                    [
+                        node_index(i, j - 1, B),
+                        node_index(i, j, B),
+                    ]
+                )
+                edge_weights.append(0.5)
+                edge_weights.append(-0.5)
 
-    edge_index = torch.tensor(edge_index, dtype=torch.long).t()
-    edge_index = to_undirected(edge_index)
+    edge_index = torch.tensor(edge_index, dtype=torch.int).t()
+    edge_weights = torch.tensor(edge_weights, dtype=torch.float32)
 
     dataset = []
     for i in range(X.shape[0]):
         Xi = torch.from_numpy(X[i].astype("float32")).to(DEVICE)
         yi = torch.from_numpy(y[i].astype("float32")).to(DEVICE)
-        g = data.Data(x=Xi, edge_index=edge_index, y=yi)
+        g = data.Data(x=Xi, edge_index=edge_index, edge_attr=edge_weights, y=yi)
         g = g.to(DEVICE)
         dataset.append(g)
 

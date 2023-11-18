@@ -39,8 +39,8 @@ class Trainer:
         self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
         self.edge_index = self.dataset[0].edge_index
         self.train_size = int(self.samples * TRAIN_RATIO)
-        self.val_size = self.samples - self.train_size
-        self.train_data, self.val_data = (
+        self.test_size = self.samples - self.train_size
+        self.train_data, self.test_data = (
             self.dataset[: self.train_size],
             self.dataset[self.train_size :],
         )
@@ -57,6 +57,7 @@ class Trainer:
 
         val_loss_list = []
         train_loss_list = []
+        min_val_loss = np.inf
 
         for epoch in range(num_epochs):
             self.model.train()
@@ -77,24 +78,43 @@ class Trainer:
             self.model.eval()
             with torch.no_grad():
                 val_loss = 0
-                for batch in self.val_data[:subset]:
+                for batch in self.test_data[:subset]:
                     y_hat = self.model(batch.x, batch.edge_index)
                     # loss = criterion(y_hat, batch.y)
                     loss = torch.sum((y_hat - batch.y) ** 2)
                     val_loss += loss.item()
 
-            avg_val_loss = val_loss / self.val_size
+            avg_val_loss = val_loss / self.test_size
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")
             val_loss_list.append(avg_val_loss)
 
-            torch.save(self.model.state_dict(), path)
+            if val_loss < min_val_loss:
+                min_val_loss = val_loss
+                torch.save(self.model.state_dict(), path)
 
         end = time.time()
         print(f"{end - start} [s]")
+        self.plot_loss(val_loss_list, train_loss_list)
 
-    def plot_predictions(self):
-        # For now, it is just hard-coded to plot first sample of train_data
-        sample = self.train_data[0]
+    @staticmethod
+    def plot_loss(val_loss_list, train_loss_list):
+        x = np.arange(1, len(train_loss_list) + 1)
+        plt.figure(figsize=(20, 7))
+        plt.plot(x, train_loss_list, label="train loss")
+        plt.plot(x, val_loss_list, label="val loss")
+        plt.title("Loss plot")
+        plt.legend()
+        plt.show()
+
+    def plot_predictions(self, type="test"):
+        if type == "train":
+            sample = self.train_data[0]
+        elif type == "test":
+            sample = self.test_data[0]
+        else:
+            print("Invalid type: (train, test)")
+            raise ValueError
+
         X = sample.x
         y = sample.y
         y = y.reshape((self.latitude, self.longitude, self.features, FH))

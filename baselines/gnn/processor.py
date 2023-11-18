@@ -16,9 +16,13 @@ def preprocess():
     grib_data = cfgrib.open_datasets(DATAPATH)
     surface = grib_data[0]
     hybrid = grib_data[1]
-    t2m_numpy = surface.t2m.to_numpy()
-    sp_numpy = surface.sp.to_numpy()
-    dataset = np.stack((t2m_numpy, sp_numpy), axis=-1)
+    t2m = surface.t2m.to_numpy() - 273.15  # -> C
+    sp = surface.sp.to_numpy() / 100  # -> hPa
+    tcc = surface.tcc.to_numpy()
+    u10 = surface.u10.to_numpy()
+    v10 = surface.v10.to_numpy()
+    tp = hybrid.tp.to_numpy().reshape((-1,) + hybrid.tp.shape[2:])
+    dataset = np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
     _, num_latitudes, num_longitudes, num_features = dataset.shape
 
     processor = DataProcessor(dataset)

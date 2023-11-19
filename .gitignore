@@ -1,4 +1,14 @@
 .ipynb_checkpoints
-data.grib
 venv
 *.idx
+*.mp4
+*.grib
+test.txt
+__pycache__
+.idea
+emc.py
+*.pt
+gnn
+*.json
+*.png
+*.zip

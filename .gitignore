@@ -8,3 +8,5 @@ __pycache__
 .idea
 emc.py
 *.pt
+
+gnn

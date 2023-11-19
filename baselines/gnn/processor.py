@@ -4,118 +4,180 @@ import torch
 import torch_geometric.data as data
 import copy
 import sys
+from torch_geometric.loader import DataLoader
 from sklearn.preprocessing import MinMaxScaler
-from baselines.gnn.config import DEVICE, FH, INPUT_SIZE, TRAIN_RATIO, DATAPATH
+from baselines.gnn.config import (
+    DEVICE,
+    FH,
+    INPUT_SIZE,
+    TRAIN_RATIO,
+    DATA_PATH,
+    BATCH_SIZE,
+)
 
 sys.path.append("..")
 from baselines.data_processor import DataProcessor
 
 
-def preprocess():
-    grib_data = cfgrib.open_datasets(DATAPATH)
-    surface = grib_data[0]
-    hybrid = grib_data[1]
-    t2m = surface.t2m.to_numpy() - 273.15  # -> C
-    sp = surface.sp.to_numpy() / 100  # -> hPa
-    tcc = surface.tcc.to_numpy()
-    u10 = surface.u10.to_numpy()
-    v10 = surface.v10.to_numpy()
-    tp = hybrid.tp.to_numpy().reshape((-1,) + hybrid.tp.shape[2:])
-    dataset = np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
-    _, num_latitudes, num_longitudes, num_features = dataset.shape
+class NNDataProcessor:
+    def __init__(self):
+        self.dataset = self.load_data()
+        (
+            _,
+            self.num_latitudes,
+            self.num_longitudes,
+            self.num_features,
+        ) = self.dataset.shape
+        self.scalers = None
+        self.edge_weights = None
+        self.edge_index = None
+        self.preprocess()
 
-    processor = DataProcessor(dataset)
-    X, y = processor.preprocess(INPUT_SIZE)
+    def preprocess(self):
+        X_train, X_test, y_train, y_test = self.train_test_split()
+        self.scalers, X, y = self.get_scalers(X_train, X_test, y_train, y_test)
+        self.edge_index, self.edge_weights = self.create_edges()
+        self.dataset = self.get_loaders(X, y)
 
-    num_samples = X.shape[0]
-    train_size = int(num_samples * TRAIN_RATIO)
-    val_size = num_samples - train_size
-    X = X.reshape(-1, num_latitudes * num_longitudes * INPUT_SIZE, num_features)
-    y = y.reshape(-1, num_latitudes * num_longitudes * FH, num_features)
+    @staticmethod
+    def load_data():
+        grib_data = cfgrib.open_datasets(DATA_PATH)
+        surface = grib_data[0]
+        hybrid = grib_data[1]
+        t2m = surface.t2m.to_numpy() - 273.15  # -> C
+        sp = surface.sp.to_numpy() / 100  # -> hPa
+        tcc = surface.tcc.to_numpy()
+        u10 = surface.u10.to_numpy()
+        v10 = surface.v10.to_numpy()
+        tp = hybrid.tp.to_numpy().reshape((-1,) + hybrid.tp.shape[2:])
+        return np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
 
-    X_train, X_test = X[:train_size], X[-val_size:]
-    y_train, y_test = y[:train_size], y[-val_size:]
+    def train_test_split(self):
+        processor = DataProcessor(self.dataset)
+        X, y = processor.preprocess(INPUT_SIZE)
 
-    scaler = MinMaxScaler()
-    scalers = [copy.deepcopy(scaler) for _ in range(num_features)]
-
-    Xi_shape = num_latitudes * num_longitudes * INPUT_SIZE
-    yi_shape = num_latitudes * num_longitudes * FH
-
-    for i in range(num_features):
-        X_train_i = X_train[..., i].reshape(-1, 1)
-        X_test_i = X_test[..., i].reshape(-1, 1)
-        y_train_i = y_train[..., i].reshape(-1, 1)
-        y_test_i = y_test[..., i].reshape(-1, 1)
-
-        scalers[i].fit(X_train_i)
-        X_train[..., i] = (
-            scalers[i].transform(X_train_i).reshape((train_size, Xi_shape))
+        num_samples = X.shape[0]
+        train_size = int(num_samples * TRAIN_RATIO)
+        test_size = num_samples - train_size
+        X = X.reshape(
+            -1, self.num_latitudes * self.num_longitudes * INPUT_SIZE, self.num_features
         )
-        X_test[..., i] = scalers[i].transform(X_test_i).reshape((val_size, Xi_shape))
-        y_train[..., i] = (
-            scalers[i].transform(y_train_i).reshape((train_size, yi_shape))
+        y = y.reshape(
+            -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
         )
-        y_test[..., i] = scalers[i].transform(y_test_i).reshape((val_size, yi_shape))
 
-    X = np.concatenate((X_train, X_test), axis=0)
-    y = np.concatenate((y_train, y_test), axis=0)
+        X_train, X_test = X[:train_size], X[-test_size:]
+        y_train, y_test = y[:train_size], y[-test_size:]
 
-    X = X.reshape(-1, num_latitudes * num_longitudes, INPUT_SIZE, num_features)
-    y = y.reshape(-1, num_latitudes * num_longitudes, FH, num_features)
-    X = X.transpose((0, 1, 3, 2))
-    y = y.transpose((0, 1, 3, 2))
+        return X_train, X_test, y_train, y_test
 
-    def node_index(i, j, num_cols):
-        return i * num_cols + j
+    def get_scalers(self, X_train, X_test, y_train, y_test):
+        train_size = len(X_train)
+        test_size = len(X_test)
 
-    B, A = num_longitudes, num_latitudes
-    edge_index = []
-    edge_weights = []
-    for i in range(A):
-        for j in range(B):
-            if i > 0:
-                edge_index.append(
-                    [
-                        node_index(i, j, B),
-                        node_index(i - 1, j, B),
-                    ]
-                )
-                edge_index.append(
-                    [
-                        node_index(i - 1, j, B),
-                        node_index(i, j, B),
-                    ]
-                )
-                edge_weights.append(0.5)
-                edge_weights.append(-0.5)
+        scaler = MinMaxScaler()
+        scalers = [copy.deepcopy(scaler) for _ in range(self.num_features)]
 
-            if j > 0:
-                edge_index.append(
-                    [
-                        node_index(i, j, B),
-                        node_index(i, j - 1, B),
-                    ]
-                )
-                edge_index.append(
-                    [
-                        node_index(i, j - 1, B),
-                        node_index(i, j, B),
-                    ]
-                )
-                edge_weights.append(0.5)
-                edge_weights.append(-0.5)
+        Xi_shape = self.num_latitudes * self.num_longitudes * INPUT_SIZE
+        yi_shape = self.num_latitudes * self.num_longitudes * FH
 
-    edge_index = torch.tensor(edge_index, dtype=torch.int).t()
-    edge_weights = torch.tensor(edge_weights, dtype=torch.float32)
+        for i in range(self.num_features):
+            X_train_i = X_train[..., i].reshape(-1, 1)
+            X_test_i = X_test[..., i].reshape(-1, 1)
+            y_train_i = y_train[..., i].reshape(-1, 1)
+            y_test_i = y_test[..., i].reshape(-1, 1)
 
-    dataset = []
-    for i in range(X.shape[0]):
-        Xi = torch.from_numpy(X[i].astype("float32")).to(DEVICE)
-        yi = torch.from_numpy(y[i].astype("float32")).to(DEVICE)
-        g = data.Data(x=Xi, edge_index=edge_index, edge_attr=edge_weights, y=yi)
-        g = g.to(DEVICE)
-        dataset.append(g)
+            scalers[i].fit(X_train_i)
+            X_train[..., i] = (
+                scalers[i].transform(X_train_i).reshape((train_size, Xi_shape))
+            )
+            X_test[..., i] = (
+                scalers[i].transform(X_test_i).reshape((test_size, Xi_shape))
+            )
+            y_train[..., i] = (
+                scalers[i].transform(y_train_i).reshape((train_size, yi_shape))
+            )
+            y_test[..., i] = (
+                scalers[i].transform(y_test_i).reshape((test_size, yi_shape))
+            )
 
-    shapes = (num_samples, num_latitudes, num_longitudes, num_features)
-    return dataset, scalers, shapes
+        X = np.concatenate((X_train, X_test), axis=0)
+        y = np.concatenate((y_train, y_test), axis=0)
+
+        X = X.reshape(
+            -1, self.num_latitudes * self.num_longitudes, INPUT_SIZE, self.num_features
+        )
+        y = y.reshape(
+            -1, self.num_latitudes * self.num_longitudes, FH, self.num_features
+        )
+        X = X.transpose((0, 1, 3, 2))
+        y = y.transpose((0, 1, 3, 2))
+
+        return scalers, X, y
+
+    def create_edges(self):
+        def node_index(i, j, num_cols):
+            return i * num_cols + j
+
+        edge_index = []
+        edge_weights = []
+        for i in range(self.num_latitudes):
+            for j in range(self.num_longitudes):
+                if i > 0:
+                    edge_index.append(
+                        [
+                            node_index(i, j, self.num_longitudes),
+                            node_index(i - 1, j, self.num_longitudes),
+                        ]
+                    )
+                    edge_index.append(
+                        [
+                            node_index(i - 1, j, self.num_longitudes),
+                            node_index(i, j, self.num_longitudes),
+                        ]
+                    )
+                    edge_weights.append(0.5)
+                    edge_weights.append(-0.5)
+
+                if j > 0:
+                    edge_index.append(
+                        [
+                            node_index(i, j, self.num_longitudes),
+                            node_index(i, j - 1, self.num_longitudes),
+                        ]
+                    )
+                    edge_index.append(
+                        [
+                            node_index(i, j - 1, self.num_longitudes),
+                            node_index(i, j, self.num_longitudes),
+                        ]
+                    )
+                    edge_weights.append(0.5)
+                    edge_weights.append(-0.5)
+
+        edge_index = torch.tensor(edge_index, dtype=torch.int).t().to(DEVICE)
+        edge_weights = torch.tensor(edge_weights, dtype=torch.float32).to(DEVICE)
+
+        return edge_index, edge_weights
+
+    def get_loaders(self, X, y):
+        dataset = []
+        for i in range(X.shape[0]):
+            Xi = torch.from_numpy(X[i].astype("float32")).to(DEVICE)
+            yi = torch.from_numpy(y[i].astype("float32")).to(DEVICE)
+            g = data.Data(
+                x=Xi, edge_index=self.edge_index, edge_attr=self.edge_weights, y=yi
+            )
+            g = g.to(DEVICE)
+            dataset.append(g)
+
+        # loader = DataLoader(dataset, batch_size=BATCH_SIZE)
+        return dataset
+
+    def get_shapes(self):
+        return (
+            len(self.dataset),
+            self.num_latitudes,
+            self.num_longitudes,
+            self.num_features,
+        )

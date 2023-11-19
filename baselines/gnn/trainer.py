@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import time
 
 from torch.optim.lr_scheduler import StepLR
-from baselines.gnn.processor import preprocess
+from baselines.gnn.processor import NNDataProcessor
 from baselines.gnn.config import DEVICE, FH, TRAIN_RATIO
 from baselines.gnn.callbacks import LRAdjustCallback, CkptCallback
 from baselines.gnn.temporal_gnn import TemporalGNN
@@ -13,22 +13,35 @@ from baselines.gnn.temporal_gnn import TemporalGNN
 
 class Trainer:
     def __init__(self, hidden_dim=2048, lr=0.001, gamma=0.5):
-        self.dataset, self.scalers, self.shapes = preprocess()
-        self.samples, self.latitude, self.longitude, self.features = self.shapes
-        self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
-        self.edge_index = self.dataset[0].edge_index
-        self.edge_weights = self.dataset[0].edge_attr
+
+        # Full data preprocessing for nn input run in NNDataProcessor constructor
+        self.nn_proc = NNDataProcessor()
+        self.dataset = self.nn_proc.dataset
+        (
+            self.samples,
+            self.latitude,
+            self.longitude,
+            self.features,
+        ) = self.nn_proc.get_shapes()
+        self.edge_index = self.nn_proc.edge_index
+        self.edge_weights = self.nn_proc.edge_weights
+        self.scalers = self.nn_proc.scalers
         self.train_size = int(self.samples * TRAIN_RATIO)
         self.test_size = self.samples - self.train_size
         self.train_data, self.test_data = (
             self.dataset[: self.train_size],
             self.dataset[self.train_size :],
         )
+
+        # Architecture details
+        self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
         self.criterion = lambda output, target: (output - target).pow(2).sum()
         self.lr = lr
         self.gamma = gamma
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=self.gamma)
+
+        # Callbacks
         self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler)
         self.ckp_callback = CkptCallback(self.model)
 
@@ -63,7 +76,7 @@ class Trainer:
 
             avg_loss = total_loss / len(self.train_data[:subset])
             print(
-                f"Epoch {epoch + 1}/{num_epochs}, Learning Rate: {self.scheduler.get_last_lr()[0]:.6f}, Train Loss: {avg_loss:.4f}"
+                f"Epoch {epoch + 1}/{num_epochs}, lr: {self.scheduler.get_last_lr()[0]:.6f}, Train Loss: {avg_loss:.4f}"
             )
             train_loss_list.append(avg_loss)
             self.lr_callback.step(avg_loss)
@@ -97,6 +110,8 @@ class Trainer:
         plt.show()
 
     def plot_predictions(self, type="test"):
+        # TODO
+        # for now it is just hard-coded as first train or test sample
         if type == "train":
             sample = self.train_data[0]
         elif type == "test":
@@ -154,6 +169,7 @@ class Trainer:
                 _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
     def evaluate(self):
+        # TODO
         pass
 
     def get_model(self):

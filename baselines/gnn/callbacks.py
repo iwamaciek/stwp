@@ -18,7 +18,7 @@ class LRAdjustCallback:
         else:
             self.counter += 1
             if self.counter >= self.patience:
-                print(f"\n[Callback] Adjusting learning rate. Counter: {self.counter}")
+                print(f"\n[Callback] Adjusting lr. Counter: {self.counter}")
                 self.adjust_learning_rate()
                 self.counter = 0
 

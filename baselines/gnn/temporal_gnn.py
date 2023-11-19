@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import time
+
+from torch.optim.lr_scheduler import StepLR
 from torch_geometric_temporal.nn.recurrent import A3TGCN
 from baselines.gnn.processor import preprocess
 from baselines.gnn.config import DEVICE, FH, TRAIN_RATIO
@@ -21,15 +23,23 @@ class TemporalGNN(torch.nn.Module):
         )
         self.batch_norm = nn.BatchNorm1d(hidden_dim)
         self.dropout = nn.Dropout(0.3)
-        self.linear = torch.nn.Linear(hidden_dim, output_dim * input_dim)
+        self.linear1 = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim // 2)
+        self.linear3 = torch.nn.Linear(hidden_dim // 2, hidden_dim // 4)
+        self.linear4 = torch.nn.Linear(hidden_dim // 4, hidden_dim // 8)
+        self.linear5 = torch.nn.Linear(hidden_dim // 8, output_dim * input_dim)
 
     def forward(self, x, edge_index, edge_weights):
         # h = self.tgnn(x, edge_index)
         h = self.tgnn(x, edge_index, edge_weights)
         h = F.relu(h)
         h = self.batch_norm(h)
-        h = self.dropout(h)
-        h = self.linear(h)
+        # h = self.dropout(h)
+        h = self.linear1(h)
+        h = self.linear2(h)
+        h = self.linear3(h)
+        h = self.linear4(h)
+        h = self.linear5(h)
         return h.view(-1, x.size(1), self.output_dim)
 
 
@@ -48,7 +58,9 @@ class Trainer:
         )
 
     def train(self, num_epochs=50, subset=None, path="model_state.pt"):
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+        gradient_clip = 1.0
         # criterion = nn.MSELoss()
         # criterion = criterion.to(DEVICE)
 
@@ -65,16 +77,23 @@ class Trainer:
             self.model.train()
             total_loss = 0
             for batch in self.train_data[:subset]:
-                optimizer.zero_grad()
                 y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
-                # loss = criterion(y_hat, batch.y)
+
                 loss = torch.sum((y_hat - batch.y) ** 2)
                 loss.backward()
+
+                nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+
                 optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+
                 total_loss += loss.item()
 
             avg_loss = total_loss / self.train_size
-            print(f"Epoch {epoch + 1}/{num_epochs}\nTrain Loss: {avg_loss:.4f}")
+            print(
+                f"Epoch {epoch + 1}/{num_epochs}, Learning Rate: {scheduler.get_last_lr()[0]:.6f}, Train Loss: {avg_loss:.4f}"
+            )
             train_loss_list.append(avg_loss)
 
             self.model.eval()
@@ -164,3 +183,6 @@ class Trainer:
                 ax[j, k].set_title(title)
                 ax[j, k].axis("off")
                 _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+
+    def get_model(self):
+        return self.model

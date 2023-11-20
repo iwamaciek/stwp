@@ -18,14 +18,13 @@ class LRAdjustCallback:
         else:
             self.counter += 1
             if self.counter >= self.patience:
-                print(f"\n[Callback] Adjusting lr. Counter: {self.counter}")
+                print(f"\n[Callback] Adjusting lr. Counter: {self.counter}\n")
                 self.adjust_learning_rate()
                 self.counter = 0
 
     def adjust_learning_rate(self):
         for param_group in self.optimizer.param_groups:
             param_group["lr"] *= 0.5
-        self.scheduler.last_epoch = -1
 
 
 class CkptCallback:
@@ -38,3 +37,21 @@ class CkptCallback:
         if loss < self.best_loss:
             self.best_loss = loss
             torch.save(self.model.state_dict(), self.path)
+
+
+class EarlyStoppingCallback:
+    def __init__(self, patience=30):
+        self.patience = patience
+        self.counter = 0
+        self.best_loss = np.inf
+        self.early_stop = False
+
+    def step(self, val_loss):
+        if val_loss < self.best_loss:
+            self.best_loss = val_loss
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+                print("Early stopping ....")

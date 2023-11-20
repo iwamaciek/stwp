@@ -6,19 +6,26 @@ import time
 
 from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
-from baselines.gnn.config import DEVICE, FH, TRAIN_RATIO
-from baselines.gnn.callbacks import LRAdjustCallback, CkptCallback
+from baselines.gnn.config import DEVICE, FH, BATCH_SIZE
+from baselines.gnn.callbacks import (
+    LRAdjustCallback,
+    CkptCallback,
+    EarlyStoppingCallback,
+)
 from baselines.gnn.temporal_gnn import TemporalGNN
 
 
 class Trainer:
-    def __init__(self, hidden_dim=2048, lr=0.001, gamma=0.5):
+    def __init__(self, hidden_dim=2048, lr=0.001, gamma=0.5, subset=None):
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
+        # If subset param is given train_data and test_data will have len=subset
         self.nn_proc = NNDataProcessor()
-        self.dataset = self.nn_proc.dataset
+        self.nn_proc.preprocess(subset=subset)
+        self.train_loader = self.nn_proc.train_loader
+        self.test_loader = self.nn_proc.test_loader
         (
-            self.samples,
+            _,
             self.latitude,
             self.longitude,
             self.features,
@@ -26,12 +33,12 @@ class Trainer:
         self.edge_index = self.nn_proc.edge_index
         self.edge_weights = self.nn_proc.edge_weights
         self.scalers = self.nn_proc.scalers
-        self.train_size = int(self.samples * TRAIN_RATIO)
-        self.test_size = self.samples - self.train_size
-        self.train_data, self.test_data = (
-            self.dataset[: self.train_size],
-            self.dataset[self.train_size :],
-        )
+        self.train_size = len(self.train_loader)
+        self.test_size = len(self.test_loader)
+        if subset is None:
+            self.subset = self.train_size
+        else:
+            self.subset = subset
 
         # Architecture details
         self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
@@ -43,17 +50,15 @@ class Trainer:
 
         # Callbacks
         self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler)
-        self.ckp_callback = CkptCallback(self.model)
+        self.ckpt_callback = CkptCallback(self.model)
+        self.early_stop_callback = EarlyStoppingCallback()
 
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path))
 
-    def train(self, num_epochs=50, subset=None):
+    def train(self, num_epochs=50):
         gradient_clip = 1.0
         start = time.time()
-
-        if subset is None:
-            subset = self.train_size
 
         val_loss_list = []
         train_loss_list = []
@@ -61,7 +66,7 @@ class Trainer:
         for epoch in range(num_epochs):
             self.model.train()
             total_loss = 0
-            for batch in self.train_data[:subset]:
+            for batch in self.train_loader:
                 y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
 
                 loss = self.criterion(y_hat, batch.y)
@@ -74,26 +79,32 @@ class Trainer:
 
                 total_loss += loss.item()
 
-            avg_loss = total_loss / len(self.train_data[:subset])
-            print(
-                f"Epoch {epoch + 1}/{num_epochs}, lr: {self.scheduler.get_last_lr()[0]:.6f}, Train Loss: {avg_loss:.4f}"
-            )
+            avg_loss = total_loss / (self.subset * BATCH_SIZE)
             train_loss_list.append(avg_loss)
-            self.lr_callback.step(avg_loss)
+            last_lr = self.optimizer.param_groups[0]["lr"]
+
+            print(
+                f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.4f}, lr: {last_lr}"
+            )
 
             self.model.eval()
             with torch.no_grad():
                 val_loss = 0
-                for batch in self.test_data[:subset]:
+                for batch in self.test_loader:
                     y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
                     loss = self.criterion(y_hat, batch.y)
                     val_loss += loss.item()
 
-            avg_val_loss = val_loss / len(self.test_data[:subset])
-            print(f"Val Loss: {avg_val_loss:.4f}\n---------")
+            avg_val_loss = val_loss / (min(self.subset, self.test_size) * BATCH_SIZE)
             val_loss_list.append(avg_val_loss)
 
-            self.ckp_callback.step(avg_val_loss)
+            print(f"Val Loss: {avg_val_loss:.4f}\n---------")
+
+            self.lr_callback.step(avg_loss)
+            self.ckpt_callback.step(avg_val_loss)
+            self.early_stop_callback.step(avg_loss)
+            if self.early_stop_callback.early_stop:
+                break
 
         end = time.time()
         print(f"{end - start} [s]")
@@ -109,64 +120,78 @@ class Trainer:
         plt.legend()
         plt.show()
 
-    def plot_predictions(self, type="test"):
-        # TODO
-        # for now it is just hard-coded as first train or test sample
-        if type == "train":
-            sample = self.train_data[0]
-        elif type == "test":
-            sample = self.test_data[0]
-        else:
-            print("Invalid type: (train, test)")
-            raise ValueError
-
-        X = sample.x
-        y = sample.y
-        y = y.reshape((self.latitude, self.longitude, self.features, FH))
+    def inverse_normalization(self, X, y):
+        y = y.reshape((BATCH_SIZE, self.latitude, self.longitude, self.features, FH))
         y = y.cpu().detach().numpy()
 
         y_hat = self.model(X, self.edge_index, self.edge_weights)
-        y_hat = y_hat.reshape((self.latitude, self.longitude, self.features, FH))
+        y_hat = y_hat.reshape(
+            (BATCH_SIZE, self.latitude, self.longitude, self.features, FH)
+        )
         y_hat = y_hat.cpu().detach().numpy()
 
         yshape = (self.latitude, self.longitude, FH)
 
         for i in range(self.features):
-            yi = y[..., i, :].copy().reshape(-1, 1)
-            yhat_i = y_hat[..., i, :].copy().reshape(-1, 1)
+            for j in range(BATCH_SIZE):
+                yi = y[j, ..., i, :].copy().reshape(-1, 1)
+                yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
-            y[..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
-            y_hat[..., i, :] = self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
+                y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
+                y_hat[j, ..., i, :] = (
+                    self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
+                )
 
-        for i in range(self.features):
-            loss = np.mean(
-                np.abs(y_hat[..., i, :].reshape(-1, 1) - y[..., i, :].reshape(-1, 1))
+        return y, y_hat
+
+    def plot_predictions(self, data_type="test"):
+        # TODO
+        # for now it is just hard-coded as first train or test sample
+        if data_type == "train":
+            sample = next(iter(self.train_loader))
+        elif data_type == "test":
+            sample = next(iter(self.test_loader))
+        else:
+            print("Invalid type: (train, test)")
+            raise ValueError
+
+        X, y = sample.x, sample.y
+        y, y_hat = self.inverse_normalization(X, y)
+
+        for i in range(BATCH_SIZE):
+            fig, ax = plt.subplots(
+                self.features, 3 * FH, figsize=(10 * FH, 3 * self.features)
             )
-            print(f"MAE for {i + 1} feature: {loss}")
+            for j in range(self.features):
+                cur_feature = f"f{j}"
+                for k in range(3 * FH):
+                    ts = k // 3
+                    if k % 3 == 0:
+                        title = rf"$X_{{{cur_feature},t+{ts + 1}}}$"
+                        value = y[i, ..., j, ts]
+                        cmap = plt.cm.coolwarm
+                    elif k % 3 == 1:
+                        title = rf"$\hat{{X}}_{{{cur_feature},t+{ts + 1}}}$"
+                        value = y_hat[i, ..., j, ts]
+                        cmap = plt.cm.coolwarm
+                    else:
+                        title = rf"$|X - \hat{{X}}|_{{{cur_feature},t+{ts + 1}}}$"
+                        value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
+                        cmap = "binary"
 
-        fig, ax = plt.subplots(
-            self.features, 2 * FH, figsize=(10 * FH, 3 * self.features)
-        )
+                    pl = ax[j, k].imshow(
+                        value.reshape(self.latitude, self.longitude), cmap=cmap
+                    )
+                    ax[j, k].set_title(title)
+                    ax[j, k].axis("off")
+                    _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
         for j in range(self.features):
             cur_feature = f"f{j}"
-            ts = 0
-            for k in range(2 * FH):
-                if k % 2 == 0:
-                    title = rf"$X_{{{cur_feature},t+{ts + 1}}}$"
-                    value = y[..., j, :]
-                    cmap = plt.cm.coolwarm
-                else:
-                    title = rf"$\hat{{X}}_{{{cur_feature},t+{ts + 1}}}$"
-                    value = y_hat[..., j, :]
-                    cmap = plt.cm.coolwarm
-
-                pl = ax[j, k].imshow(
-                    value.reshape(self.latitude, self.longitude), cmap=cmap
-                )
-                ax[j, k].set_title(title)
-                ax[j, k].axis("off")
-                _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+            loss = np.mean(
+                np.abs(y_hat[..., j, :].reshape(-1, 1) - y[..., j, :].reshape(-1, 1))
+            )
+            print(f"MAE for {cur_feature}: {loss}")
 
     def evaluate(self):
         # TODO

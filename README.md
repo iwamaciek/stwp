@@ -13,7 +13,11 @@ pip install -r requirements.txt
 pre-commits install
 ```
 ### Hyperparameter optimization
- For linear regression:
+For linear regression:
 ```shell
-python hpo_linear_regression.py <number of trials> <use neighbours: True or False>
+python hpo_linear_regression.py <baseline_type: linear or simple-linear> <number of trials> <use neighbours: True or False>
+```
+Sample:
+```shell
+python hpo_linear_regression.py linear 5 False
 ```

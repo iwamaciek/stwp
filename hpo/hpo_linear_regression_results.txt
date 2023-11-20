@@ -6,3 +6,35 @@ Best input window: 6
 Best regressor type: ridge
 Best regularization constant: 1.5000000000000002
 _____________________________________________
+20-11-2023 20:13:S
+Number of trials: 5
+Neighbours used: No
+Best hyperparameters:
+Best input window: 6
+Best regressor type: elastic_net
+Best regularization constant: 0.30000000000000004
+_____________________________________________
+20-11-2023 21:22:S
+Used baseline: linearNumber of trials: 5
+Neighbours used: No
+Best hyperparameters:
+Best input window: 7
+Best regressor type: ridge
+Best regularization constant: 1.1
+_____________________________________________
+20-11-2023 21:26:S
+Used baseline: simple-linearNumber of trials: 5
+Neighbours used: No
+Best hyperparameters:
+Best input window: 6
+Best regressor type: ridge
+Best regularization constant: 0.5
+_____________________________________________
+20-11-2023 21:27:S
+Used baseline: simple-linearNumber of trials: 5
+Neighbours used: No
+Best hyperparameters:
+Best input window: 6
+Best regressor type: ridge
+Best regularization constant: 0.5117557928701486
+_____________________________________________

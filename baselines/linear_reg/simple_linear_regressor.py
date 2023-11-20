@@ -48,11 +48,11 @@ class SimpleLinearRegressor(BaselineRegressor):
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
 
-    def train(self, X_train, y_train, normalized=False):
+    def train(self, X_train, y_train, normalize=False):
         for i in range(self.features):
             Xi = X_train[..., i].reshape(-1, self.neighbours * self.input_state)
             yi = y_train[..., 0, i].reshape(-1, 1)
-            if normalized:
+            if normalize:
                 self.scalers[i].fit(yi)
             self.models[i].fit(Xi, yi)
 

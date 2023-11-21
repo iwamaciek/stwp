@@ -6,17 +6,20 @@ import time
 
 from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
-from baselines.gnn.config import DEVICE, FH, BATCH_SIZE
+from baselines.gnn.config import DEVICE, FH, BATCH_SIZE, INPUT_SIZE
 from baselines.gnn.callbacks import (
     LRAdjustCallback,
     CkptCallback,
     EarlyStoppingCallback,
 )
 from baselines.gnn.temporal_gnn import TemporalGNN
+from baselines.gnn.crystal_gcn import CrystalGNN
 
 
 class Trainer:
-    def __init__(self, hidden_dim=2048, lr=0.001, gamma=0.5, subset=None):
+    def __init__(
+        self, architecture="a3tgcn", hidden_dim=2048, lr=0.001, gamma=0.5, subset=None
+    ):
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
         # If subset param is given train_data and test_data will have len=subset
@@ -41,7 +44,16 @@ class Trainer:
             self.subset = subset
 
         # Architecture details
-        self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
+        if architecture == "a3tgcn":
+            self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
+        elif architecture == "cgcn":
+            self.model = CrystalGNN(self.features * INPUT_SIZE, 1, hidden_dim).to(
+                DEVICE
+            )
+        else:
+            # TODO handling
+            self.model = None
+
         self.criterion = lambda output, target: (output - target).pow(2).sum()
         self.lr = lr
         self.gamma = gamma

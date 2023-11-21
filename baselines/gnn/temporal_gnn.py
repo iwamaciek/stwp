@@ -23,8 +23,9 @@ class TemporalGNN(torch.nn.Module):
         self.linear5 = torch.nn.Linear(hidden_dim // 8, output_dim * input_dim)
 
     def forward(self, x, edge_index, edge_weights):
-        # h = self.tgnn(x, edge_index)
+        # torch.Size([2250, 6, 3])
         h = self.tgnn(x, edge_index, edge_weights)
+        # torch.Size([2250, 2048])
         h = F.relu(h)
         h = self.batch_norm(h)
         # h = self.dropout(h)  # for now I want to overfit xd

@@ -2,11 +2,11 @@ from torch import nn, cat
 from torch.nn.functional import relu
 
 class UNet(nn.Module):
-    def __init__(self, features=6, ):
+    def __init__(self, features=6, s=3, fh=2):
         super().__init__()
         
         # Encoder
-        self.enc11 = nn.Conv2d(features, 16, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc11 = nn.Conv2d(s*features, 16, kernel_size=3, padding=1, padding_mode='zeros')
         self.enc12 = nn.Conv2d(16, 16, kernel_size=3, padding=1, padding_mode='zeros')
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
@@ -35,7 +35,7 @@ class UNet(nn.Module):
         self.dec32 = nn.Conv2d(16, 16, kernel_size=3, padding=1, padding_mode='zeros')
         
         # Output
-        self.outconv = nn.Conv2d(16, features, kernel_size=1)
+        self.outconv = nn.Conv2d(16, fh*features, kernel_size=1)
 
     def forward(self, X):
         # Encode

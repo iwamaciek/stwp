@@ -8,7 +8,10 @@ ecmwflibs
 ecmwf-api-client
 cartopy
 numpy
+optuna
 pre-commit
 scikit-learn
+scipy
 torch
 torch_geometric
+statsmodels

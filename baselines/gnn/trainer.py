@@ -14,6 +14,7 @@ from baselines.gnn.callbacks import (
 )
 from baselines.gnn.temporal_gnn import TemporalGNN
 from baselines.gnn.crystal_gcn import CrystalGNN
+from baselines.gnn.basic_gcn import BasicGCN
 
 
 class Trainer:
@@ -50,6 +51,8 @@ class Trainer:
             self.model = CrystalGNN(self.features * INPUT_SIZE, 1, hidden_dim).to(
                 DEVICE
             )
+        elif architecture == "gcn":
+            self.model = BasicGCN(self.features * INPUT_SIZE, hidden_dim).to(DEVICE)
         else:
             # TODO handling
             self.model = None

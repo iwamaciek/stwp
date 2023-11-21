@@ -4,38 +4,39 @@ from torch.nn.functional import relu
 class UNet(nn.Module):
     def __init__(self, features=6, s=3, fh=2):
         super().__init__()
-        
+        BASE = 32
+
         # Encoder
-        self.enc11 = nn.Conv2d(s*features, 16, kernel_size=3, padding=1, padding_mode='zeros')
-        self.enc12 = nn.Conv2d(16, 16, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc11 = nn.Conv2d(s*features, BASE, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc12 = nn.Conv2d(BASE, BASE, kernel_size=3, padding=1, padding_mode='zeros')
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.enc21 = nn.Conv2d(16, 32, kernel_size=3, padding=1, padding_mode='zeros')
-        self.enc22 = nn.Conv2d(32, 32, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc21 = nn.Conv2d(BASE, 2*BASE, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc22 = nn.Conv2d(2*BASE, 2*BASE, kernel_size=3, padding=1, padding_mode='zeros')
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.enc31 = nn.Conv2d(32, 64, kernel_size=3, padding=1, padding_mode='zeros')
-        self.enc32 = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc31 = nn.Conv2d(2*BASE, 4*BASE, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc32 = nn.Conv2d(4*BASE, 4*BASE, kernel_size=3, padding=1, padding_mode='zeros')
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.enc41 = nn.Conv2d(64, 128, kernel_size=3, padding=1, padding_mode='zeros')
-        self.enc42 = nn.Conv2d(128, 128, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc41 = nn.Conv2d(4*BASE, 8*BASE, kernel_size=3, padding=1, padding_mode='zeros')
+        self.enc42 = nn.Conv2d(8*BASE, 8*BASE, kernel_size=3, padding=1, padding_mode='zeros')
 
         # Decoder
-        self.upconv1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.dec11 = nn.Conv2d(128, 64, kernel_size=3, padding=1, padding_mode='zeros')
-        self.dec12 = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode='zeros')
+        self.upconv1 = nn.ConvTranspose2d(8*BASE, 4*BASE, kernel_size=2, stride=2)
+        self.dec11 = nn.Conv2d(8*BASE, 4*BASE, kernel_size=3, padding=1, padding_mode='zeros')
+        self.dec12 = nn.Conv2d(4*BASE, 4*BASE, kernel_size=3, padding=1, padding_mode='zeros')
 
-        self.upconv2 = nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2)
-        self.dec21 = nn.Conv2d(64, 32, kernel_size=3, padding=1, padding_mode='zeros')
-        self.dec22 = nn.Conv2d(32, 32, kernel_size=3, padding=1, padding_mode='zeros')
+        self.upconv2 = nn.ConvTranspose2d(4*BASE, 2*BASE, kernel_size=2, stride=2)
+        self.dec21 = nn.Conv2d(4*BASE, 2*BASE, kernel_size=3, padding=1, padding_mode='zeros')
+        self.dec22 = nn.Conv2d(2*BASE, 2*BASE, kernel_size=3, padding=1, padding_mode='zeros')
 
-        self.upconv3 = nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2)
-        self.dec31 = nn.Conv2d(32, 16, kernel_size=3, padding=1, padding_mode='zeros')
-        self.dec32 = nn.Conv2d(16, 16, kernel_size=3, padding=1, padding_mode='zeros')
+        self.upconv3 = nn.ConvTranspose2d(2*BASE, BASE, kernel_size=2, stride=2)
+        self.dec31 = nn.Conv2d(2*BASE, BASE, kernel_size=3, padding=1, padding_mode='zeros')
+        self.dec32 = nn.Conv2d(BASE, BASE, kernel_size=3, padding=1, padding_mode='zeros')
         
         # Output
-        self.outconv = nn.Conv2d(16, fh*features, kernel_size=1)
+        self.outconv = nn.Conv2d(BASE, fh*features, kernel_size=1)
 
     def forward(self, X):
         # Encode

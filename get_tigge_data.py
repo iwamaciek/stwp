@@ -3,7 +3,7 @@ from ecmwfapi import ECMWFDataServer
 
 server = ECMWFDataServer()
 
-dates = "2023-10-01/to/2023-10-02"
+dates = "2022-01-01/to/2022-12-31"
 
 server.retrieve({
     "class": "ti",

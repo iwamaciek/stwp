@@ -76,7 +76,7 @@ c.retrieve(
             25,
         ],
     },
-    "../data2022.grib",
+    "../data2022_full.grib",
 )
 
 # ~ 18min

@@ -23,7 +23,7 @@ def load_tigge_0_to_12_by_6(grib_file):
     grib_data = cfgrib.open_datasets(grib_file)
 
     tcc_tigge = grib_data[0].tcc.to_numpy()
-    tcc_step_0, tcc_step_6, tcc_step_12 = step_split(tcc_tigge)
+    tcc_step_0, tcc_step_6, tcc_step_12 = step_split(tcc_tigge) / 100
 
     u10_tigge = grib_data[1].u10.to_numpy()
     u10_step_0, u10_step_6, u10_step_12 = step_split(u10_tigge)
@@ -38,7 +38,7 @@ def load_tigge_0_to_12_by_6(grib_file):
     sp_step_0, sp_step_6, sp_step_12 = step_split(sp_tigge) / 100
 
     tp_tigge = grib_data[3].tp.to_numpy()
-    tp_step_0, tp_step_6, tp_step_12 = step_split(tp_tigge)
+    tp_step_0, tp_step_6, tp_step_12 = step_split(tp_tigge) / 1000
 
     data_step_0 = np.stack((t2m_step_0, sp_step_0, tcc_step_0, u10_step_0, v10_step_0, tp_step_0), axis=-1)
     data_step_6 = np.stack((t2m_step_6, sp_step_6, tcc_step_6, u10_step_6, v10_step_6, tp_step_6), axis=-1)

@@ -7,7 +7,10 @@ eccodes
 ecmwflibs
 cartopy
 numpy
+optuna
 pre-commit
 scikit-learn
+scipy
 torch
 torch_geometric
+statsmodels

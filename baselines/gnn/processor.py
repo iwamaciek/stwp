@@ -6,7 +6,7 @@ import copy
 import sys
 from torch_geometric.loader import DataLoader
 from sklearn.preprocessing import MinMaxScaler
-from baselines.gnn.config import (
+from baselines.config import (
     DEVICE,
     FH,
     INPUT_SIZE,
@@ -21,7 +21,7 @@ from baselines.data_processor import DataProcessor
 
 class NNDataProcessor:
     def __init__(self):
-        self.dataset = self.load_data()
+        self.dataset, self.feature_list = DataProcessor.load_data()
         (
             self.num_samples,
             self.num_latitudes,
@@ -43,19 +43,6 @@ class NNDataProcessor:
         X_train, X_test, y_train, y_test = self.train_test_split()
         X, y = self.get_scalers(X_train, X_test, y_train, y_test)
         self.train_loader, self.test_loader = self.get_loaders(X, y, subset)
-
-    @staticmethod
-    def load_data():
-        grib_data = cfgrib.open_datasets(DATA_PATH)
-        surface = grib_data[0]
-        hybrid = grib_data[1]
-        t2m = surface.t2m.to_numpy() - 273.15  # -> C
-        sp = surface.sp.to_numpy() / 100  # -> hPa
-        tcc = surface.tcc.to_numpy()
-        u10 = surface.u10.to_numpy()
-        v10 = surface.v10.to_numpy()
-        tp = hybrid.tp.to_numpy().reshape((-1,) + hybrid.tp.shape[2:])
-        return np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
 
     def train_test_split(self):
         processor = DataProcessor(self.dataset)

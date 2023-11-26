@@ -6,7 +6,7 @@ import time
 
 from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
-from baselines.gnn.config import DEVICE, FH, BATCH_SIZE, INPUT_SIZE
+from baselines.config import DEVICE, FH, BATCH_SIZE, INPUT_SIZE
 from baselines.gnn.callbacks import (
     LRAdjustCallback,
     CkptCallback,
@@ -135,20 +135,18 @@ class Trainer:
         plt.legend()
         plt.show()
 
-    def inverse_normalization(self, X, y):
-        y = y.reshape((BATCH_SIZE, self.latitude, self.longitude, self.features, FH))
+    def inverse_normalization_predict(self, X, y):
+        y = y.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y = y.cpu().detach().numpy()
 
         y_hat = self.model(X, self.edge_index, self.edge_weights)
-        y_hat = y_hat.reshape(
-            (BATCH_SIZE, self.latitude, self.longitude, self.features, FH)
-        )
+        y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y_hat = y_hat.cpu().detach().numpy()
 
         yshape = (self.latitude, self.longitude, FH)
 
         for i in range(self.features):
-            for j in range(BATCH_SIZE):
+            for j in range(y_hat.shape[0]):
                 yi = y[j, ..., i, :].copy().reshape(-1, 1)
                 yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
@@ -171,7 +169,7 @@ class Trainer:
             raise ValueError
 
         X, y = sample.x, sample.y
-        y, y_hat = self.inverse_normalization(X, y)
+        y, y_hat = self.inverse_normalization_predict(X, y)
 
         for i in range(BATCH_SIZE):
             fig, ax = plt.subplots(
@@ -203,14 +201,34 @@ class Trainer:
 
         for j in range(self.features):
             cur_feature = f"f{j}"
-            loss = np.mean(
-                np.abs(y_hat[..., j, :].reshape(-1, 1) - y[..., j, :].reshape(-1, 1))
-            )
-            print(f"MAE for {cur_feature}: {loss}")
+            loss = (
+                np.mean(
+                    (y_hat[..., j, :].reshape(-1, 1) - y[..., j, :].reshape(-1, 1)) ** 2
+                )
+            ) ** 0.5
+            print(f"RMSE for {cur_feature}: {loss}")
 
-    def evaluate(self):
-        # TODO
-        pass
+    def evaluate(self, data_type="test"):
+        if data_type == "train":
+            loader = self.train_loader
+        elif data_type == "test":
+            loader = self.test_loader
+        else:
+            print("Invalid type: (train, test)")
+            raise ValueError
+
+        y = np.empty((0, self.latitude, self.longitude, self.features, FH))
+        y_hat = np.empty((0, self.latitude, self.longitude, self.features, FH))
+        for batch in loader:
+            y_i, y_hat_i = self.inverse_normalization_predict(batch.x, batch.y)
+            y = np.concatenate((y, y_i), axis=0)
+            y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
+
+        for i in range(self.features):
+            y_fi = y[..., i, :].reshape(-1, 1)
+            y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
+            rmse_fi = np.mean((y_fi - y_hat_fi) ** 2) ** (1 / 2)
+            print(f"RMSE for f{i}: {rmse_fi}")
 
     def get_model(self):
         return self.model

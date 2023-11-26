@@ -44,21 +44,6 @@ class NNDataProcessor:
         X, y = self.get_scalers(X_train, X_test, y_train, y_test)
         self.train_loader, self.test_loader = self.get_loaders(X, y, subset)
 
-    @staticmethod
-    def load_data(data=DATA_PATH):
-        grib_data = cfgrib.open_datasets(data)
-        surface = grib_data[0]
-        hybrid = grib_data[1]
-        t2m = surface.t2m.to_numpy() - 273.15  # -> C
-        sp = surface.sp.to_numpy() / 100  # -> hPa
-        tcc = surface.tcc.to_numpy()
-        u10 = surface.u10.to_numpy()
-        v10 = surface.v10.to_numpy()
-        tp = hybrid.tp.to_numpy()
-        if(tp.ndim >= 4):
-            tp = tp.reshape((-1,) + hybrid.tp.shape[2:])
-        return np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
-
     def train_test_split(self):
         processor = DataProcessor(self.dataset)
         X, y = processor.preprocess(INPUT_SIZE)

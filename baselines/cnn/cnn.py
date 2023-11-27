@@ -2,9 +2,9 @@ from torch import nn, cat
 from torch.nn.functional import relu
 
 class UNet(nn.Module):
-    def __init__(self, features=6, s=3, fh=2):
+    def __init__(self, features=6, s=3, fh=2, base_units=16):
         super().__init__()
-        BASE = 16
+        BASE = base_units
 
         # Encoder
         self.enc11 = nn.Conv2d(s*features, BASE, kernel_size=3, padding=1, padding_mode='reflect')

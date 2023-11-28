@@ -13,7 +13,7 @@ from sklearn.preprocessing import (
 class LightGBMRegressor(BaselineRegressor):
     def __init__(self, X_shape, fh, feature_list, scaler_type="robust"):
         super().__init__(X_shape, fh, feature_list)
-        self.model = LGBMRegressor()
+        self.model = LGBMRegressor(verbose=-1)
 
         if scaler_type == "min_max":
             self.scaler = MinMaxScaler()
@@ -29,3 +29,11 @@ class LightGBMRegressor(BaselineRegressor):
 
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
+
+    def train(self, X_train, y_train, normalize=False):
+        X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
+        for i in range(self.features):
+            yi = y_train[..., 0, i].reshape(-1)
+            if normalize:
+                self.scalers[i].fit(yi)
+            self.models[i].fit(X, yi)

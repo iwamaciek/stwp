@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import cfgrib
 import numpy as np
+from baselines.config import DATA_PATH, TRAIN_RATIO
 from random import sample
 
 
@@ -8,6 +10,23 @@ class DataProcessor:
         self.data = data
         self.samples, self.latitude, self.longitude, self.features = data.shape
         self.neighbours, self.input_size = None, None
+
+    @staticmethod
+    def load_data(path=DATA_PATH):
+        grib_data = cfgrib.open_datasets(path)
+        surface = grib_data[0]
+        hybrid = grib_data[1]
+        t2m = surface.t2m.to_numpy() - 273.15  # -> C
+        sp = surface.sp.to_numpy() / 100  # -> hPa
+        tcc = surface.tcc.to_numpy()
+        u10 = surface.u10.to_numpy()
+        v10 = surface.v10.to_numpy()
+        tp = hybrid.tp.to_numpy()
+        if tp.ndim >= 4:
+            tp = tp.reshape((-1,) + hybrid.tp.shape[2:])
+        data = np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
+        feature_list = ["t2m", "tcc", "u10", "v10", "tp", "sp"]
+        return data, feature_list
 
     def flatten(self):
         self.data = self.data.reshape(-1, self.latitude * self.longitude, self.features)
@@ -46,6 +65,7 @@ class DataProcessor:
         return count, indices
 
     def create_neighbours(self, radius):
+        # TODO make it more efficient
         self.neighbours, indices = self.count_neighbours(radius=radius)
         neigh_data = np.empty(
             (
@@ -70,11 +90,6 @@ class DataProcessor:
                             neigh_data[s, la, lo, n] = self.data[s, la, lo]
 
         self.data = neigh_data
-        # TODO make it more efficient:
-        # shifted_data = np.roll(self.data, (0, ii, ij, 0, 0), axis=(0, 1, 2, 3, 4))
-        # mask = (ii > 0) & (ii < self.latitude) & (ij > 0) & (ij < self.longitude)
-        # mask = mask[..., np.newaxis, np.newaxis]
-        # neigh_data[:, :, :, i, :, :] = shifted_data * mask
 
     def preprocess(self, input_size, fh=1, r=1, use_neighbours=False):
         self.create_autoregressive_sequences(sequence_length=input_size + fh)
@@ -87,7 +102,7 @@ class DataProcessor:
         return X, y
 
     @staticmethod
-    def train_test_split(X, y, train_split=0.8):
+    def train_test_split(X, y, train_split=TRAIN_RATIO):
         n = len(X)
         train_samples = int(train_split * len(X))
         indices = sample(range(len(X)), train_samples)

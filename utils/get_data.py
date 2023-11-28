@@ -15,7 +15,7 @@ c.retrieve(
             "total_cloud_cover",
             "total_precipitation",
         ],
-        "year": "2022",
+        "year": ["2021", "2022"],
         "month": [
             "01",
             "02",
@@ -61,6 +61,7 @@ c.retrieve(
             "28",
             "29",
             "30",
+            "31",
         ],
         "time": [
             "00:00",
@@ -75,7 +76,7 @@ c.retrieve(
             25,
         ],
     },
-    "data2022-2div.grib",
+    "../data2021_2022.grib",
 )
 
-# ~ 18min
+# ~ 14min

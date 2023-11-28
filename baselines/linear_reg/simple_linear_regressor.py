@@ -118,11 +118,12 @@ class SimpleLinearRegressor(BaselineRegressor):
 
         _, indices = DataProcessor.count_neighbours(radius=radius)
         Y_out = np.empty((self.latitude, self.longitude, self.neighbours, Y.shape[-1]))
-        for n in range(self.neighbours):
+        Y_out[..., 0, :] = Y.reshape((self.latitude, self.longitude, -1))
+        for n in range(1, self.neighbours):
             i, j = indices[n - 1]
             for lo in range(self.longitude):
                 for la in range(self.latitude):
-                    if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                    if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
                         Y_out[la, lo, n] = Y[la + i, lo + j]
                     else:
                         Y_out[la, lo, n] = Y[la, lo]

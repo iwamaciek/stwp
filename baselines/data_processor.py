@@ -83,7 +83,7 @@ class DataProcessor:
             for s in range(self.samples):
                 for la in range(self.latitude):
                     for lo in range(self.longitude):
-                        if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                        if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
                             neigh_data[s, la, lo, n] = self.data[s, la + i, lo + j]
                         else:
                             neigh_data[s, la, lo, n] = self.data[s, la, lo]

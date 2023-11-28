@@ -5,6 +5,7 @@ xarray
 cfgrib
 eccodes
 ecmwflibs
+ecmwf-api-client
 cartopy
 numpy
 optuna

@@ -6,7 +6,7 @@ import time
 
 from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
-from baselines.gnn.config import DEVICE, FH, BATCH_SIZE, INPUT_SIZE
+from baselines.config import DEVICE, FH, BATCH_SIZE, INPUT_SIZE
 from baselines.gnn.callbacks import (
     LRAdjustCallback,
     CkptCallback,

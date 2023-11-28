@@ -48,11 +48,11 @@ class SimpleLinearRegressor(BaselineRegressor):
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
 
-    def train(self, X_train, y_train, normalized=False):
+    def train(self, X_train, y_train, normalize=False):
         for i in range(self.features):
             Xi = X_train[..., i].reshape(-1, self.neighbours * self.input_state)
             yi = y_train[..., 0, i].reshape(-1, 1)
-            if normalized:
+            if normalize:
                 self.scalers[i].fit(yi)
             self.models[i].fit(Xi, yi)
 
@@ -118,11 +118,12 @@ class SimpleLinearRegressor(BaselineRegressor):
 
         _, indices = DataProcessor.count_neighbours(radius=radius)
         Y_out = np.empty((self.latitude, self.longitude, self.neighbours, Y.shape[-1]))
-        for n in range(self.neighbours):
+        Y_out[..., 0, :] = Y.reshape((self.latitude, self.longitude, -1))
+        for n in range(1, self.neighbours):
             i, j = indices[n - 1]
             for lo in range(self.longitude):
                 for la in range(self.latitude):
-                    if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                    if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
                         Y_out[la, lo, n] = Y[la + i, lo + j]
                     else:
                         Y_out[la, lo, n] = Y[la, lo]

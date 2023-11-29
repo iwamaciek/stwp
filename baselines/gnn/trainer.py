@@ -13,8 +13,8 @@ from baselines.gnn.callbacks import (
     EarlyStoppingCallback,
 )
 from baselines.gnn.temporal_gnn import TemporalGNN
-from baselines.gnn.crystal_gcn import CrystalGNN
-from baselines.gnn.basic_gcn import BasicGCN
+# from baselines.gnn.crystal_gcn import CrystalGNN
+# from baselines.gnn.basic_gcn import BasicGCN
 
 
 class Trainer:
@@ -28,6 +28,7 @@ class Trainer:
         self.nn_proc.preprocess(subset=subset)
         self.train_loader = self.nn_proc.train_loader
         self.test_loader = self.nn_proc.test_loader
+        self.feature_list = self.nn_proc.feature_list
         (
             _,
             self.latitude,
@@ -47,12 +48,12 @@ class Trainer:
         # Architecture details
         if architecture == "a3tgcn":
             self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
-        elif architecture == "cgcn":
-            self.model = CrystalGNN(self.features * INPUT_SIZE, 1, hidden_dim).to(
-                DEVICE
-            )
-        elif architecture == "gcn":
-            self.model = BasicGCN(self.features * INPUT_SIZE, hidden_dim).to(DEVICE)
+        # elif architecture == "cgcn":
+        #     self.model = CrystalGNN(self.features * INPUT_SIZE, 1, hidden_dim).to(
+        #         DEVICE
+        #     )
+        # elif architecture == "gcn":
+        #     self.model = BasicGCN(self.features * INPUT_SIZE, hidden_dim).to(DEVICE)
         else:
             # TODO handling
             self.model = None
@@ -199,14 +200,14 @@ class Trainer:
                     ax[j, k].axis("off")
                     _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
-        for j in range(self.features):
+        for j, name in enumerate(self.feature_list):
             cur_feature = f"f{j}"
             loss = (
                 np.mean(
                     (y_hat[..., j, :].reshape(-1, 1) - y[..., j, :].reshape(-1, 1)) ** 2
                 )
             ) ** 0.5
-            print(f"RMSE for {cur_feature}: {loss}")
+            print(f"RMSE for {name}: {loss}")
 
     def evaluate(self, data_type="test"):
         if data_type == "train":
@@ -224,11 +225,11 @@ class Trainer:
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
-        for i in range(self.features):
+        for i, name in enumerate(self.feature_list):
             y_fi = y[..., i, :].reshape(-1, 1)
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
             rmse_fi = np.mean((y_fi - y_hat_fi) ** 2) ** (1 / 2)
-            print(f"RMSE for f{i}: {rmse_fi}")
+            print(f"RMSE for {name}: {rmse_fi}")
 
     def get_model(self):
         return self.model

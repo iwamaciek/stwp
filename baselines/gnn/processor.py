@@ -46,7 +46,7 @@ class NNDataProcessor:
 
     def train_test_split(self):
         processor = DataProcessor(self.dataset)
-        X, y = processor.preprocess(INPUT_SIZE)
+        X, y = processor.preprocess(INPUT_SIZE, FH)
 
         self.num_samples = X.shape[0]
         self.train_size = int(self.num_samples * TRAIN_RATIO)

@@ -37,6 +37,7 @@ class Trainer:
         ) = self.nn_proc.get_shapes()
         self.edge_index = self.nn_proc.edge_index
         self.edge_weights = self.nn_proc.edge_weights
+        self.edge_attr = self.nn_proc.edge_attr
         self.scalers = self.nn_proc.scalers
         self.train_size = len(self.train_loader)
         self.test_size = len(self.test_loader)
@@ -51,9 +52,9 @@ class Trainer:
                 DEVICE
             )
         elif architecture == "cgcn":
-            self.model = CrystalGNN(self.features, self.features, 1, hidden_dim).to(
-                DEVICE
-            )
+            self.model = CrystalGNN(
+                self.features, self.features, self.edge_attr.size(-1), hidden_dim
+            ).to(DEVICE)
         elif architecture == "gcn":
             self.model = BasicGCN(self.features, self.features, hidden_dim).to(DEVICE)
         else:

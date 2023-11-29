@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch_geometric.nn.conv import CGConv
-from baselines.config import INPUT_SIZE, FH
+from baselines.config import INPUT_SIZE, FH, BATCH_SIZE
 
 N = 5
 
@@ -16,7 +16,6 @@ class CrystalGNN(torch.nn.Module):
         self.mlp_decoder = nn.Linear(hidden_dim, output_features * FH)
 
     def forward(self, x, edge_index, edge_attr):
-        edge_attr = edge_attr.view(-1, 1)
         x = x.view(-1, x.size(-2) * x.size(-1))
         x = self.mlp_embedder(x).relu()
         for cgcnn in self.cgcnns:

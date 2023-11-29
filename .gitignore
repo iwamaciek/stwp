@@ -11,3 +11,4 @@ emc.py
 *.json
 *.png
 *.zip
+gnn_test

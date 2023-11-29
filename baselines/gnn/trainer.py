@@ -4,9 +4,10 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import time
 
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
-from baselines.config import DEVICE, FH, BATCH_SIZE, INPUT_SIZE
+from baselines.config import DEVICE, FH, BATCH_SIZE
 from baselines.gnn.callbacks import (
     LRAdjustCallback,
     CkptCallback,
@@ -46,17 +47,20 @@ class Trainer:
 
         # Architecture details
         if architecture == "a3tgcn":
-            self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
+            self.model = TemporalGNN(self.features, self.features, hidden_dim).to(
+                DEVICE
+            )
         elif architecture == "cgcn":
-            self.model = CrystalGNN(self.features * INPUT_SIZE, 1, hidden_dim).to(
+            self.model = CrystalGNN(self.features, self.features, 1, hidden_dim).to(
                 DEVICE
             )
         elif architecture == "gcn":
-            self.model = BasicGCN(self.features * INPUT_SIZE, hidden_dim).to(DEVICE)
+            self.model = BasicGCN(self.features, self.features, hidden_dim).to(DEVICE)
         else:
             # TODO handling
             self.model = None
 
+        # Training details
         self.criterion = lambda output, target: (output - target).pow(2).sum()
         self.lr = lr
         self.gamma = gamma
@@ -135,11 +139,11 @@ class Trainer:
         plt.legend()
         plt.show()
 
-    def inverse_normalization_predict(self, X, y):
+    def inverse_normalization_predict(self, X, y, edge_index, edge_attr):
         y = y.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y = y.cpu().detach().numpy()
 
-        y_hat = self.model(X, self.edge_index, self.edge_weights)
+        y_hat = self.model(X, edge_index, edge_attr)
         y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y_hat = y_hat.cpu().detach().numpy()
 
@@ -169,7 +173,9 @@ class Trainer:
             raise ValueError
 
         X, y = sample.x, sample.y
-        y, y_hat = self.inverse_normalization_predict(X, y)
+        y, y_hat = self.inverse_normalization_predict(
+            X, y, sample.edge_index, sample.edge_attr
+        )
 
         for i in range(BATCH_SIZE):
             fig, ax = plt.subplots(
@@ -201,12 +207,11 @@ class Trainer:
 
         for j in range(self.features):
             cur_feature = f"f{j}"
-            loss = (
-                np.mean(
-                    (y_hat[..., j, :].reshape(-1, 1) - y[..., j, :].reshape(-1, 1)) ** 2
-                )
-            ) ** 0.5
-            print(f"RMSE for {cur_feature}: {loss}")
+            y_hat_fj = y_hat[..., j, :].reshape(-1, 1)
+            y_fj = y[..., j, :].reshape(-1, 1)
+            rmse = np.sqrt(mean_squared_error(y_hat_fj, y_fj))
+            mae = mean_absolute_error(y_hat_fj, y_fj)
+            print(f"RMSE for {cur_feature}: {rmse}; MAE for {cur_feature}: {mae};")
 
     def evaluate(self, data_type="test"):
         if data_type == "train":
@@ -220,15 +225,18 @@ class Trainer:
         y = np.empty((0, self.latitude, self.longitude, self.features, FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, FH))
         for batch in loader:
-            y_i, y_hat_i = self.inverse_normalization_predict(batch.x, batch.y)
+            y_i, y_hat_i = self.inverse_normalization_predict(
+                batch.x, batch.y, batch.edge_index, batch.edge_attr
+            )
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
         for i in range(self.features):
             y_fi = y[..., i, :].reshape(-1, 1)
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
-            rmse_fi = np.mean((y_fi - y_hat_fi) ** 2) ** (1 / 2)
-            print(f"RMSE for f{i}: {rmse_fi}")
+            rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
+            mae = mean_absolute_error(y_hat_fi, y_fi)
+            print(f"RMSE for f{i}: {rmse}; MAE for f{i}: {mae};")
 
     def get_model(self):
         return self.model

@@ -1,4 +1,3 @@
-import cfgrib
 import numpy as np
 import torch
 import torch_geometric.data as data
@@ -11,7 +10,6 @@ from baselines.config import (
     FH,
     INPUT_SIZE,
     TRAIN_RATIO,
-    DATA_PATH,
     BATCH_SIZE,
 )
 
@@ -118,6 +116,7 @@ class NNDataProcessor:
 
         edge_index = []
         edge_weights = []
+        edge_attr = []
         for i in range(self.num_latitudes):
             for j in range(self.num_longitudes):
                 if i > 0:
@@ -152,7 +151,7 @@ class NNDataProcessor:
                     edge_weights.append(0.5)
                     edge_weights.append(-0.5)
 
-        edge_index = torch.tensor(edge_index, dtype=torch.int).t().to(DEVICE)
+        edge_index = torch.tensor(edge_index, dtype=torch.int64).t().to(DEVICE)
         edge_weights = torch.tensor(edge_weights, dtype=torch.float32).to(DEVICE)
 
         return edge_index, edge_weights

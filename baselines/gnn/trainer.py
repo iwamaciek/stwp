@@ -20,7 +20,7 @@ from baselines.gnn.basic_gcn import BasicGCN
 
 class Trainer:
     def __init__(
-        self, architecture="a3tgcn", hidden_dim=2048, lr=0.001, gamma=0.5, subset=None
+        self, architecture="a3tgcn", hidden_dim=64, lr=0.01, gamma=0.5, subset=None
     ):
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
@@ -89,17 +89,25 @@ class Trainer:
             for batch in self.train_loader:
                 y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
 
-                loss = self.criterion(y_hat, batch.y)
+                loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
                 loss.backward()
 
-                nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
 
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
                 total_loss += loss.item()
 
-            avg_loss = total_loss / (self.subset * BATCH_SIZE)
+            # total_norm = 0
+            # for p in self.model.parameters():
+            #     if p.grad is not None:
+            #         param_norm = p.grad.data.norm(2)
+            #         total_norm += param_norm.item() ** 2
+            # total_norm = total_norm ** 0.5
+            # print(f'Gradient Norm: {total_norm:.4f}')
+            #
+            avg_loss = total_loss / self.subset
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
 
@@ -112,10 +120,10 @@ class Trainer:
                 val_loss = 0
                 for batch in self.test_loader:
                     y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
-                    loss = self.criterion(y_hat, batch.y)
+                    loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
                     val_loss += loss.item()
 
-            avg_val_loss = val_loss / (min(self.subset, self.test_size) * BATCH_SIZE)
+            avg_val_loss = val_loss / min(self.subset, self.test_size)
             val_loss_list.append(avg_val_loss)
 
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")

@@ -3,8 +3,10 @@ import torch
 import torch_geometric.data as data
 import copy
 import sys
+from torch.utils.data import RandomSampler
 from torch_geometric.loader import DataLoader
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+from sklearn.utils import shuffle
 from baselines.config import (
     DEVICE,
     FH,
@@ -67,7 +69,7 @@ class NNDataProcessor:
         self.train_size = len(X_train)
         self.test_size = len(X_test)
 
-        scaler = MinMaxScaler()
+        scaler = StandardScaler()
         self.scalers = [copy.deepcopy(scaler) for _ in range(self.num_features)]
 
         Xi_shape = self.num_latitudes * self.num_longitudes * INPUT_SIZE
@@ -228,12 +230,21 @@ class NNDataProcessor:
             g = g.to(DEVICE)
             dataset.append(g)
 
-        if subset is None:
-            train_dataset = dataset[: self.train_size]
-            test_dataset = dataset[-self.test_size :]
-        else:
-            train_dataset = dataset[: subset * BATCH_SIZE]
-            test_dataset = dataset[subset * BATCH_SIZE : subset * BATCH_SIZE * 2]
+        train_dataset = dataset[: self.train_size]
+        test_dataset = dataset[-self.test_size :]
+        # random state for reproduction
+        train_dataset = shuffle(train_dataset, random_state=42)
+        test_dataset = shuffle(test_dataset, random_state=42)
+
+        if subset is not None:
+            train_dataset = train_dataset[: subset * BATCH_SIZE]
+            test_dataset = test_dataset[: subset * BATCH_SIZE]
+
+        # if subset is None:
+        #     train_sampler, test_sampler = None, None
+        # else:
+        #     train_sampler = RandomSampler(train_dataset, num_samples=subset)
+        #     test_sampler = RandomSampler(test_dataset, num_samples=subset)
 
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
         test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)

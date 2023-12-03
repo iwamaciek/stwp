@@ -14,8 +14,8 @@ from baselines.gnn.callbacks import (
     EarlyStoppingCallback,
 )
 from baselines.gnn.temporal_gnn import TemporalGNN
-# from baselines.gnn.crystal_gcn import CrystalGNN
-# from baselines.gnn.basic_gcn import BasicGCN
+from baselines.gnn.crystal_gcn import CrystalGNN
+from baselines.gnn.basic_gcn import BasicGCN
 
 
 class Trainer:
@@ -192,7 +192,7 @@ class Trainer:
                 self.features, 3 * FH, figsize=(10 * FH, 3 * self.features)
             )
             for j in range(self.features):
-                cur_feature = f"f{j}"
+                cur_feature = self.feature_list[j]
                 for k in range(3 * FH):
                     ts = k // 3
                     if k % 3 == 0:
@@ -216,7 +216,7 @@ class Trainer:
                     _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
         for j, name in enumerate(self.feature_list):
-            cur_feature = f"f{j}"
+            cur_feature = name
             y_hat_fj = y_hat[..., j, :].reshape(-1, 1)
             y_fj = y[..., j, :].reshape(-1, 1)
             rmse = np.sqrt(mean_squared_error(y_hat_fj, y_fj))

@@ -10,8 +10,6 @@ from baselines.gnn.trainer import Trainer as GNNTrainer
 from torch.optim.lr_scheduler import StepLR
 import torch
 import time
-import numpy as np
-import matplotlib.pyplot as plt
 
 class Trainer(GNNTrainer):
     def __init__(self, base_units=16, lr=0.01, gamma=0.5, subset=None) -> None:
@@ -92,9 +90,9 @@ class Trainer(GNNTrainer):
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")
             val_loss_list.append(avg_val_loss)
 
-            # self.lr_callback.step(avg_loss)
+            self.lr_callback.step(avg_val_loss)
             self.ckpt_callback.step(avg_val_loss)
-            self.early_stop_callback.step(avg_loss)
+            self.early_stop_callback.step(avg_val_loss)
             if self.early_stop_callback.early_stop:
                 break
 
@@ -102,7 +100,7 @@ class Trainer(GNNTrainer):
         print(f"{end - start} [s]")
         self.plot_loss(val_loss_list, train_loss_list)
 
-    def inverse_normalization_predict(self, X, y):
+    def inverse_normalization_predict(self, X, y, *args):
         X = X.reshape(-1, self.latitude, self.longitude, INPUT_SIZE*self.features).permute((0, 3, 1, 2)).to(DEVICE)
         y_hat = self.model(X)
         y_hat = y_hat.permute((0, 2, 3, 1)).reshape(-1, self.latitude, self.longitude, FH, self.features).permute((0, 1, 2, 4, 3))

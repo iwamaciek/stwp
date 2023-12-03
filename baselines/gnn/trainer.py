@@ -14,8 +14,8 @@ from baselines.gnn.callbacks import (
     EarlyStoppingCallback,
 )
 from baselines.gnn.temporal_gnn import TemporalGNN
-from baselines.gnn.crystal_gcn import CrystalGNN
-from baselines.gnn.basic_gcn import BasicGCN
+# from baselines.gnn.crystal_gcn import CrystalGNN
+# from baselines.gnn.basic_gcn import BasicGCN
 
 
 class Trainer:
@@ -29,6 +29,7 @@ class Trainer:
         self.nn_proc.preprocess(subset=subset)
         self.train_loader = self.nn_proc.train_loader
         self.test_loader = self.nn_proc.test_loader
+        self.feature_list = self.nn_proc.feature_list
         (
             _,
             self.latitude,
@@ -214,14 +215,13 @@ class Trainer:
                     ax[j, k].axis("off")
                     _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
-        for j in range(self.features):
+        for j, name in enumerate(self.feature_list):
             cur_feature = f"f{j}"
             y_hat_fj = y_hat[..., j, :].reshape(-1, 1)
             y_fj = y[..., j, :].reshape(-1, 1)
             rmse = np.sqrt(mean_squared_error(y_hat_fj, y_fj))
             mae = mean_absolute_error(y_hat_fj, y_fj)
             print(f"RMSE for {cur_feature}: {rmse}; MAE for {cur_feature}: {mae};")
-
     def evaluate(self, data_type="test"):
         if data_type == "train":
             loader = self.train_loader
@@ -240,7 +240,7 @@ class Trainer:
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
-        for i in range(self.features):
+        for i, name in enumerate(self.feature_list):
             y_fi = y[..., i, :].reshape(-1, 1)
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
             rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))

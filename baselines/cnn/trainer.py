@@ -12,7 +12,7 @@ import torch
 import time
 
 class Trainer(GNNTrainer):
-    def __init__(self, base_units=16, lr=0.01, gamma=0.5, subset=None) -> None:
+    def __init__(self, base_units=16, lr=0.001, gamma=0.001, subset=None) -> None:
         self.data_processor = CNNDataProcessor()
         self.data_processor.preprocess(subset=subset)
         self.train_loader = self.data_processor.train_loader
@@ -42,13 +42,13 @@ class Trainer(GNNTrainer):
         self.criterion = torch.nn.MSELoss()
         self.lr = lr
         self.gamma = gamma
-        self.optimizer = torch.optim.Adam(self.model.parameters())#, lr=self.lr)
-        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=self.gamma)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.scheduler = StepLR(self.optimizer, step_size=100, gamma=self.gamma)
 
         # Callbacks
-        self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler)
+        self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler, epsilon=0.01)
         self.ckpt_callback = CkptCallback(self.model)
-        self.early_stop_callback = EarlyStoppingCallback(patience=30)
+        self.early_stop_callback = EarlyStoppingCallback(patience=100)
         
     def train(self, num_epochs=100):
         train_loss_list = []
@@ -90,9 +90,9 @@ class Trainer(GNNTrainer):
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")
             val_loss_list.append(avg_val_loss)
 
-            self.lr_callback.step(avg_val_loss)
+            self.lr_callback.step(val_loss)
             self.ckpt_callback.step(avg_val_loss)
-            self.early_stop_callback.step(avg_val_loss)
+            self.early_stop_callback.step(val_loss)
             if self.early_stop_callback.early_stop:
                 break
 
@@ -110,8 +110,6 @@ class Trainer(GNNTrainer):
         y = y.cpu().detach().numpy()
 
         yshape = (self.latitude, self.longitude, FH)
-
-        # print(X.shape, y.shape, y_hat.shape)
 
         for i in range(self.features):
             for j in range(y_hat.shape[0]):

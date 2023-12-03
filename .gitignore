@@ -8,7 +8,7 @@ __pycache__
 .idea
 emc.py
 *.pt
-gnn
 *.json
 *.png
 *.zip
+gnn_test

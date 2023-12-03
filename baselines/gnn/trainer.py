@@ -4,9 +4,10 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import time
 
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
-from baselines.config import DEVICE, FH, BATCH_SIZE, INPUT_SIZE
+from baselines.config import DEVICE, FH, BATCH_SIZE
 from baselines.gnn.callbacks import (
     LRAdjustCallback,
     CkptCallback,
@@ -19,7 +20,7 @@ from baselines.gnn.temporal_gnn import TemporalGNN
 
 class Trainer:
     def __init__(
-        self, architecture="a3tgcn", hidden_dim=2048, lr=0.001, gamma=0.5, subset=None
+        self, architecture="a3tgcn", hidden_dim=64, lr=0.01, gamma=0.5, subset=None
     ):
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
@@ -37,6 +38,7 @@ class Trainer:
         ) = self.nn_proc.get_shapes()
         self.edge_index = self.nn_proc.edge_index
         self.edge_weights = self.nn_proc.edge_weights
+        self.edge_attr = self.nn_proc.edge_attr
         self.scalers = self.nn_proc.scalers
         self.train_size = len(self.train_loader)
         self.test_size = len(self.test_loader)
@@ -47,17 +49,20 @@ class Trainer:
 
         # Architecture details
         if architecture == "a3tgcn":
-            self.model = TemporalGNN(self.features, hidden_dim, FH).to(DEVICE)
-        # elif architecture == "cgcn":
-        #     self.model = CrystalGNN(self.features * INPUT_SIZE, 1, hidden_dim).to(
-        #         DEVICE
-        #     )
-        # elif architecture == "gcn":
-        #     self.model = BasicGCN(self.features * INPUT_SIZE, hidden_dim).to(DEVICE)
+            self.model = TemporalGNN(self.features, self.features, hidden_dim).to(
+                DEVICE
+            )
+        elif architecture == "cgcn":
+            self.model = CrystalGNN(
+                self.features, self.features, self.edge_attr.size(-1), hidden_dim
+            ).to(DEVICE)
+        elif architecture == "gcn":
+            self.model = BasicGCN(self.features, self.features, hidden_dim).to(DEVICE)
         else:
             # TODO handling
             self.model = None
 
+        # Training details
         self.criterion = lambda output, target: (output - target).pow(2).sum()
         self.lr = lr
         self.gamma = gamma
@@ -85,17 +90,25 @@ class Trainer:
             for batch in self.train_loader:
                 y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
 
-                loss = self.criterion(y_hat, batch.y)
+                loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
                 loss.backward()
 
-                nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
 
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
                 total_loss += loss.item()
 
-            avg_loss = total_loss / (self.subset * BATCH_SIZE)
+            # total_norm = 0
+            # for p in self.model.parameters():
+            #     if p.grad is not None:
+            #         param_norm = p.grad.data.norm(2)
+            #         total_norm += param_norm.item() ** 2
+            # total_norm = total_norm ** 0.5
+            # print(f'Gradient Norm: {total_norm:.4f}')
+            #
+            avg_loss = total_loss / self.subset
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
 
@@ -108,10 +121,10 @@ class Trainer:
                 val_loss = 0
                 for batch in self.test_loader:
                     y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
-                    loss = self.criterion(y_hat, batch.y)
+                    loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
                     val_loss += loss.item()
 
-            avg_val_loss = val_loss / (min(self.subset, self.test_size) * BATCH_SIZE)
+            avg_val_loss = val_loss / min(self.subset, self.test_size)
             val_loss_list.append(avg_val_loss)
 
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")
@@ -136,11 +149,11 @@ class Trainer:
         plt.legend()
         plt.show()
 
-    def inverse_normalization_predict(self, X, y):
+    def inverse_normalization_predict(self, X, y, edge_index, edge_attr):
         y = y.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y = y.cpu().detach().numpy()
 
-        y_hat = self.model(X, self.edge_index, self.edge_weights)
+        y_hat = self.model(X, edge_index, edge_attr)
         y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y_hat = y_hat.cpu().detach().numpy()
 
@@ -170,7 +183,9 @@ class Trainer:
             raise ValueError
 
         X, y = sample.x, sample.y
-        y, y_hat = self.inverse_normalization_predict(X, y)
+        y, y_hat = self.inverse_normalization_predict(
+            X, y, sample.edge_index, sample.edge_attr
+        )
 
         for i in range(BATCH_SIZE):
             fig, ax = plt.subplots(
@@ -202,13 +217,11 @@ class Trainer:
 
         for j, name in enumerate(self.feature_list):
             cur_feature = f"f{j}"
-            loss = (
-                np.mean(
-                    (y_hat[..., j, :].reshape(-1, 1) - y[..., j, :].reshape(-1, 1)) ** 2
-                )
-            ) ** 0.5
-            print(f"RMSE for {name}: {loss}")
-
+            y_hat_fj = y_hat[..., j, :].reshape(-1, 1)
+            y_fj = y[..., j, :].reshape(-1, 1)
+            rmse = np.sqrt(mean_squared_error(y_hat_fj, y_fj))
+            mae = mean_absolute_error(y_hat_fj, y_fj)
+            print(f"RMSE for {cur_feature}: {rmse}; MAE for {cur_feature}: {mae};")
     def evaluate(self, data_type="test"):
         if data_type == "train":
             loader = self.train_loader
@@ -221,15 +234,18 @@ class Trainer:
         y = np.empty((0, self.latitude, self.longitude, self.features, FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, FH))
         for batch in loader:
-            y_i, y_hat_i = self.inverse_normalization_predict(batch.x, batch.y)
+            y_i, y_hat_i = self.inverse_normalization_predict(
+                batch.x, batch.y, batch.edge_index, batch.edge_attr
+            )
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
         for i, name in enumerate(self.feature_list):
             y_fi = y[..., i, :].reshape(-1, 1)
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
-            rmse_fi = np.mean((y_fi - y_hat_fi) ** 2) ** (1 / 2)
-            print(f"RMSE for {name}: {rmse_fi}")
+            rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
+            mae = mean_absolute_error(y_hat_fi, y_fi)
+            print(f"RMSE for f{i}: {rmse}; MAE for f{i}: {mae};")
 
     def get_model(self):
         return self.model

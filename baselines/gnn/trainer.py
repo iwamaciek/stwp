@@ -77,7 +77,7 @@ class Trainer:
         self.model.load_state_dict(torch.load(path))
 
     def train(self, num_epochs=50):
-        gradient_clip = 1.0
+        # gradient_clip = 1.0
         start = time.time()
 
         val_loss_list = []
@@ -99,14 +99,6 @@ class Trainer:
 
                 total_loss += loss.item()
 
-            # total_norm = 0
-            # for p in self.model.parameters():
-            #     if p.grad is not None:
-            #         param_norm = p.grad.data.norm(2)
-            #         total_norm += param_norm.item() ** 2
-            # total_norm = total_norm ** 0.5
-            # print(f'Gradient Norm: {total_norm:.4f}')
-            #
             avg_loss = total_loss / self.subset
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
@@ -128,9 +120,9 @@ class Trainer:
 
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")
 
-            self.lr_callback.step(avg_loss)
+            self.lr_callback.step(avg_val_loss)
             self.ckpt_callback.step(avg_val_loss)
-            self.early_stop_callback.step(avg_loss)
+            self.early_stop_callback.step(avg_val_loss)
             if self.early_stop_callback.early_stop:
                 break
 

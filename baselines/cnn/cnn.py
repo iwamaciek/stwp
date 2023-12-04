@@ -46,7 +46,7 @@ class UNet(nn.Module):
         # Output
         self.outconv = nn.Conv2d(BASE, fh*features, kernel_size=1)
 
-    def forward(self, X):
+    def forward(self, X, *args):
         # Encode
         xe11 = relu(self.enc11(X))
         xe12 = relu(self.enc12(xe11))

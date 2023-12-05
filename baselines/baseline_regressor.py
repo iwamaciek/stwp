@@ -5,15 +5,17 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.dummy import DummyRegressor
 from baselines.data_processor import DataProcessor
-from sklearn.preprocessing import FunctionTransformer
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    StandardScaler,
+    MaxAbsScaler,
+    RobustScaler,
+)
 
 
 class BaselineRegressor:
     def __init__(
-        self,
-        X_shape: tuple,
-        fh: int,
-        feature_list: list
+        self, X_shape: tuple, fh: int, feature_list: list, scaler_type="robust"
     ):
         if len(X_shape) > 5:
             (
@@ -37,7 +39,18 @@ class BaselineRegressor:
         self.fh = fh
         self.feature_list = feature_list
 
-        self.scaler = FunctionTransformer(lambda x: x)
+        if scaler_type == "min_max":
+            self.scaler = MinMaxScaler()
+        elif scaler_type == "standard":
+            self.scaler = StandardScaler()
+        elif scaler_type == "max_abs":
+            self.scaler = MaxAbsScaler()
+        elif scaler_type == "robust":
+            self.scaler = RobustScaler()
+        else:
+            print(f"{scaler_type} scaler not implemented")
+            raise ValueError
+
         self.model = DummyRegressor()
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]

@@ -12,4 +12,5 @@ emc.py
 *.png
 *.zip
 gnn_test
+*.txt
 .DS_store

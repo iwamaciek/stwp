@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import cfgrib
 import numpy as np
-from baselines.config import DATA_PATH, TRAIN_RATIO
-from random import sample
+from baselines.config import DATA_PATH, TRAIN_RATIO, FH
 
 
 class DataProcessor:
@@ -12,7 +11,7 @@ class DataProcessor:
         self.neighbours, self.input_size = None, None
 
     @staticmethod
-    def load_data(path=DATA_PATH):
+    def load_data(path=DATA_PATH, spatial_encoding=False):
         grib_data = cfgrib.open_datasets(path)
         surface = grib_data[0]
         hybrid = grib_data[1]
@@ -25,7 +24,38 @@ class DataProcessor:
         if tp.ndim >= 4:
             tp = tp.reshape((-1,) + hybrid.tp.shape[2:])
         data = np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
-        feature_list = ["t2m", "tcc", "u10", "v10", "tp", "sp"]
+        feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
+
+        if spatial_encoding:
+
+            def spatial_encode(v, norm_v, trig_func="sin"):
+                if trig_func == "sin":
+                    v_encoded = np.sin(2 * np.pi * v / norm_v)
+                elif trig_func == "cos":
+                    v_encoded = np.cos(2 * np.pi * v / norm_v)
+                else:
+                    print("Function not implemented")
+                    return None
+                return v_encoded
+
+            spatial_encodings = np.empty(data.shape[:-1] + (4,))
+
+            latitudes = np.array(surface.latitude)
+            longitudes = np.array(surface.longitude)
+            for i, lat in enumerate(latitudes):
+                for j, lon in enumerate(longitudes):
+                    for idx, v in enumerate(
+                        [
+                            spatial_encode(lat, 180, "sin"),
+                            spatial_encode(lat, 180, "cos"),
+                            spatial_encode(lon, 360, "sin"),
+                            spatial_encode(lon, 360, "cos"),
+                        ]
+                    ):
+                        spatial_encodings[:, i, j, idx] = np.repeat(v, data.shape[0])
+
+            data = np.concatenate((data, spatial_encodings), axis=-1)
+
         return data, feature_list
 
     def flatten(self):
@@ -91,7 +121,7 @@ class DataProcessor:
 
         self.data = neigh_data
 
-    def preprocess(self, input_size, fh=1, r=1, use_neighbours=False):
+    def preprocess(self, input_size, fh=FH, r=1, use_neighbours=False):
         self.create_autoregressive_sequences(sequence_length=input_size + fh)
         if use_neighbours:
             self.create_neighbours(radius=r)

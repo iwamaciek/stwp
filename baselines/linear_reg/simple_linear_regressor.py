@@ -4,7 +4,6 @@ import numpy as np
 from baselines.data_processor import DataProcessor
 from baselines.baseline_regressor import BaselineRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, MaxAbsScaler
 
 
 class SimpleLinearRegressor(BaselineRegressor):
@@ -18,7 +17,6 @@ class SimpleLinearRegressor(BaselineRegressor):
         fh,
         feature_list,
         regressor_type="linear",
-        scaler_type="min_max",
         alpha=1.0,
     ):
         super().__init__(X_shape, fh, feature_list)
@@ -35,24 +33,13 @@ class SimpleLinearRegressor(BaselineRegressor):
             print(f"{regressor_type} regressor not implemented")
             raise ValueError
 
-        if scaler_type == "min_max":
-            self.scaler = MinMaxScaler()
-        elif scaler_type == "standard":
-            self.scaler = StandardScaler()
-        elif scaler_type == "max_abs":
-            self.scaler = MaxAbsScaler()
-        else:
-            print(f"{scaler_type} scaler not implemented")
-            raise ValueError
-
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
-        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
 
-    def train(self, X_train, y_train, normalized=False):
+    def train(self, X_train, y_train, normalize=False):
         for i in range(self.features):
             Xi = X_train[..., i].reshape(-1, self.neighbours * self.input_state)
             yi = y_train[..., 0, i].reshape(-1, 1)
-            if normalized:
+            if normalize:
                 self.scalers[i].fit(yi)
             self.models[i].fit(Xi, yi)
 
@@ -118,11 +105,12 @@ class SimpleLinearRegressor(BaselineRegressor):
 
         _, indices = DataProcessor.count_neighbours(radius=radius)
         Y_out = np.empty((self.latitude, self.longitude, self.neighbours, Y.shape[-1]))
-        for n in range(self.neighbours):
+        Y_out[..., 0, :] = Y.reshape((self.latitude, self.longitude, -1))
+        for n in range(1, self.neighbours):
             i, j = indices[n - 1]
             for lo in range(self.longitude):
                 for la in range(self.latitude):
-                    if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                    if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
                         Y_out[la, lo, n] = Y[la + i, lo + j]
                     else:
                         Y_out[la, lo, n] = Y[la, lo]

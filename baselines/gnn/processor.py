@@ -21,7 +21,9 @@ from baselines.data_processor import DataProcessor
 
 class NNDataProcessor:
     def __init__(self):
-        self.dataset, self.feature_list = DataProcessor.load_data()
+        self.dataset, self.feature_list = DataProcessor.load_data(
+            spatial_encoding=False
+        )
         (
             self.num_samples,
             self.num_latitudes,

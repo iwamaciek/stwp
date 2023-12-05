@@ -2,18 +2,20 @@
 import numpy as np
 import copy
 from matplotlib import pyplot as plt
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.dummy import DummyRegressor
 from baselines.data_processor import DataProcessor
-from sklearn.preprocessing import FunctionTransformer
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    StandardScaler,
+    MaxAbsScaler,
+    RobustScaler,
+)
 
 
 class BaselineRegressor:
     def __init__(
-        self,
-        X_shape: tuple,
-        fh: int,
-        feature_list: list,
+        self, X_shape: tuple, fh: int, feature_list: list, scaler_type="robust"
     ):
         if len(X_shape) > 5:
             (
@@ -37,7 +39,18 @@ class BaselineRegressor:
         self.fh = fh
         self.feature_list = feature_list
 
-        self.scaler = FunctionTransformer(lambda x: x)
+        if scaler_type == "min_max":
+            self.scaler = MinMaxScaler()
+        elif scaler_type == "standard":
+            self.scaler = StandardScaler()
+        elif scaler_type == "max_abs":
+            self.scaler = MaxAbsScaler()
+        elif scaler_type == "robust":
+            self.scaler = RobustScaler()
+        else:
+            print(f"{scaler_type} scaler not implemented")
+            raise ValueError
+
         self.model = DummyRegressor()
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
@@ -62,6 +75,19 @@ class BaselineRegressor:
             rmse_features.append(err)
         return rmse_features
 
+    def get_mae(self, y_hat, y_test, normalize=False):
+        mae_features = []
+        for i in range(self.features):
+            y_hat_i = y_hat[..., i].reshape(-1, 1)
+            y_test_i = y_test[..., i].reshape(-1, 1)
+            if normalize:
+                y_test_i = self.scalers[i].transform(y_test_i)
+                y_hat_i = self.scalers[i].transform(y_hat_i)
+            # err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
+            err = round(mean_absolute_error(y_hat_i, y_test_i), 3)
+            mae_features.append(err)
+        return mae_features
+
     def evaluate(self, y_hat, y_test):
         return self.get_rmse(y_hat, y_test)
 
@@ -80,9 +106,14 @@ class BaselineRegressor:
                     y_test_sample_feature_j, y_hat_sample_feature_j
                 )
                 rmse = np.sqrt(mse)
+                mae = mean_absolute_error(
+                    y_test_sample_feature_j, y_hat_sample_feature_j
+                )
                 std = np.std(y_test_sample_feature_j)
                 sqrt_n = np.sqrt(y_test_sample_feature_j.shape[0])
-                print(f"{cur_feature} => RMSE:  {round(rmse,5)}; SE: {std / sqrt_n}")
+                print(
+                    f"{cur_feature} => RMSE:  {round(rmse,5)}; MAE: {mae}; SE: {std / sqrt_n}"
+                )
 
                 for k in range(3 * self.fh):
                     ts = k // 3
@@ -124,6 +155,7 @@ class BaselineRegressor:
         y_hat = self.predict_(X_test, y_test)
         self.plot_predictions(y_hat, y_test, max_samples=max_samples)
         eval_scores = self.evaluate(y_hat, y_test)
+        mae_scores = self.get_mae(y_hat, y_test)
         print("=======================================")
         print("Evaluation metrics for entire test set:")
         print("=======================================")
@@ -131,7 +163,7 @@ class BaselineRegressor:
         sqrt_n = np.sqrt(y_test.shape[0] * self.latitude * self.longitude * self.fh)
         for i in range(self.features):
             print(
-                f"{self.feature_list[i]} => RMSE: {eval_scores[i]}; SE: {np.std(y_test[...,i]) / sqrt_n}"
+                f"{self.feature_list[i]} => RMSE: {eval_scores[i]};  MAE: {mae_scores[i]}; SE: {np.std(y_test[...,i]) / sqrt_n}"
             )
 
         return y_hat
@@ -140,7 +172,7 @@ class BaselineRegressor:
         """
         Prediction in an autoregressive manner:
         Depends on forecasting horizon parameter, each model prediction
-        becomes a part of an input for next prediction.
+        becomes a part of an input for next timestamp prediction.
 
         self.input_size -> n
         self.fh -> k
@@ -162,13 +194,13 @@ class BaselineRegressor:
                 Xik = Xi
                 if k > -1:
                     if self.neighbours > 1:
-                        Yik[..., k, :] = self.extend(y_hat[i, ..., k : k + 1, :])
+                        Yik[..., k, :] = self.extend(y_hat[i, ..., k, :])
                         Xik = np.concatenate(
-                            (Xi[..., k + 1 :, :], Yik[..., : k + 1, :]), axis=3
+                            (Xi[..., k + 1 :, :], Yik[..., : k + 1, :]), axis=-2
                         )
                     else:
                         Xik = np.concatenate(
-                            (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=2
+                            (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=-2
                         )
                 for j in range(self.features):
                     y_hat[i, ..., k + 1, j] = (
@@ -201,11 +233,12 @@ class BaselineRegressor:
         Y_out = np.empty(
             (self.latitude, self.longitude, self.neighbours, self.features)
         )
-        for n in range(self.neighbours):
+        Y_out[..., 0, :] = Y
+        for n in range(1, self.neighbours):
             i, j = indices[n - 1]
             for lo in range(self.longitude):
                 for la in range(self.latitude):
-                    if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                    if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
                         Y_out[la, lo, n] = Y[la + i, lo + j]
                     else:
                         Y_out[la, lo, n] = Y[la, lo]

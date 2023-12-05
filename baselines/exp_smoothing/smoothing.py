@@ -18,13 +18,16 @@ class SmoothingPredictor(BaselineRegressor):
             print("Not implemented")
             raise ValueError
 
-        self.params = [0.4 if fname == "t2m" else (0.6 if fname == "tcc" else 0.8) for fname in self.feature_list]
+        self.params = [
+            0.4 if fname == "t2m" else (0.6 if fname == "tcc" else 0.8)
+            for fname in self.feature_list
+        ]
 
     def train(self, X_train, y_train, normalized=False):
         print("Not needed")
         raise KeyError
 
-    def predict_(self, X_test, y_test, alpha):
+    def predict_(self, X_test, y_test):
         X = X_test.reshape(
             -1, self.latitude, self.longitude, self.input_state, self.features
         )
@@ -43,27 +46,25 @@ class SmoothingPredictor(BaselineRegressor):
                                     initialization_method="known",
                                     initial_level=X[i, lat, lon, 0, j],
                                 )
-                                .fit(
-                                    smoothing_level=self.params[j],
-                                    optimized=False
-                                )
+                                .fit(smoothing_level=self.params[j], optimized=False)
                                 .forecast(self.fh)
                             )
                         elif self.type == "holt":
-                            forecast = (
-                                Holt(
-                                    X[i, lat, lon, :, j],
-                                    initialization_method="known",
-                                    initial_level=X[i, lat, lon, 0, j],
-                                    initial_trend=(X[i, lat, lon, -1, j]-X[i, lat, lon, 0, j])/self.input_state,
-                                )
-                                .fit(
-                                    smoothing_level=0.05,
-                                    smoothing_trend=(X[i, lat, lon, -1, j]-X[i, lat, lon, 0, j])/self.input_state,
-                                    optimized=False,
-                                )
-                                .forecast(self.fh)
-                            )
+                            raise DeprecationWarning("Please use the simple type")
+                            # forecast = (
+                            #     Holt(
+                            #         X[i, lat, lon, :, j],
+                            #         initialization_method="known",
+                            #         initial_level=X[i, lat, lon, 0, j],
+                            #         initial_trend=(X[i, lat, lon, -1, j]-X[i, lat, lon, 0, j])/self.input_state,
+                            #     )
+                            #     .fit(
+                            #         smoothing_level=0.05,
+                            #         smoothing_trend=(X[i, lat, lon, -1, j]-X[i, lat, lon, 0, j])/self.input_state,
+                            #         optimized=False,
+                            #     )
+                            #     .forecast(self.fh)
+                            # )
                         else:
                             raise ValueError
                         ylon.append(forecast)

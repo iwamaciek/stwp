@@ -30,12 +30,9 @@ class Trainer:
         self.train_loader = self.nn_proc.train_loader
         self.test_loader = self.nn_proc.test_loader
         self.feature_list = self.nn_proc.feature_list
-        (
-            _,
-            self.latitude,
-            self.longitude,
-            self.features,
-        ) = self.nn_proc.get_shapes()
+        self.features = len(self.feature_list)
+        (_, self.latitude, self.longitude, accum_features) = self.nn_proc.get_shapes()
+        self.constants = accum_features - self.features
         self.edge_index = self.nn_proc.edge_index
         self.edge_weights = self.nn_proc.edge_weights
         self.edge_attr = self.nn_proc.edge_attr
@@ -49,15 +46,20 @@ class Trainer:
 
         # Architecture details
         if architecture == "a3tgcn":
-            self.model = TemporalGNN(self.features, self.features, hidden_dim).to(
-                DEVICE
-            )
+            self.model = TemporalGNN(
+                self.features + self.constants, self.features, hidden_dim
+            ).to(DEVICE)
         elif architecture == "cgcn":
             self.model = CrystalGNN(
-                self.features, self.features, self.edge_attr.size(-1), hidden_dim
+                self.features + self.constants,
+                self.features,
+                self.edge_attr.size(-1),
+                hidden_dim,
             ).to(DEVICE)
         elif architecture == "gcn":
-            self.model = BasicGCN(self.features, self.features, hidden_dim).to(DEVICE)
+            self.model = BasicGCN(
+                self.features + self.constants, self.features, hidden_dim
+            ).to(DEVICE)
         else:
             # TODO handling
             self.model = None
@@ -66,7 +68,10 @@ class Trainer:
         self.criterion = lambda output, target: (output - target).pow(2).sum()
         self.lr = lr
         self.gamma = gamma
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.AdamW(
+            self.model.parameters(), betas=(0.9, 0.95), weight_decay=0.1, lr=self.lr
+        )
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=self.gamma)
 
         # Callbacks
@@ -78,7 +83,7 @@ class Trainer:
         self.model.load_state_dict(torch.load(path))
 
     def train(self, num_epochs=50):
-        gradient_clip = 1.0
+        gradient_clip = 32
         start = time.time()
 
         val_loss_list = []
@@ -93,21 +98,13 @@ class Trainer:
                 loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
                 loss.backward()
 
-                # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+                nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
 
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
                 total_loss += loss.item()
 
-            # total_norm = 0
-            # for p in self.model.parameters():
-            #     if p.grad is not None:
-            #         param_norm = p.grad.data.norm(2)
-            #         total_norm += param_norm.item() ** 2
-            # total_norm = total_norm ** 0.5
-            # print(f'Gradient Norm: {total_norm:.4f}')
-            #
             avg_loss = total_loss / self.subset
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
@@ -129,9 +126,9 @@ class Trainer:
 
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")
 
-            self.lr_callback.step(avg_loss)
+            self.lr_callback.step(avg_val_loss)
             self.ckpt_callback.step(avg_val_loss)
-            self.early_stop_callback.step(avg_loss)
+            self.early_stop_callback.step(avg_val_loss)
             if self.early_stop_callback.early_stop:
                 break
 
@@ -191,20 +188,20 @@ class Trainer:
             fig, ax = plt.subplots(
                 self.features, 3 * FH, figsize=(10 * FH, 3 * self.features)
             )
-            for j in range(self.features):
-                cur_feature = self.feature_list[j]
+
+            for j, feature_name in enumerate(self.feature_list):
                 for k in range(3 * FH):
                     ts = k // 3
                     if k % 3 == 0:
-                        title = rf"$X_{{{cur_feature},t+{ts + 1}}}$"
+                        title = rf"$X_{{{feature_name},t+{ts + 1}}}$"
                         value = y[i, ..., j, ts]
                         cmap = plt.cm.coolwarm
                     elif k % 3 == 1:
-                        title = rf"$\hat{{X}}_{{{cur_feature},t+{ts + 1}}}$"
+                        title = rf"$\hat{{X}}_{{{feature_name},t+{ts + 1}}}$"
                         value = y_hat[i, ..., j, ts]
                         cmap = plt.cm.coolwarm
                     else:
-                        title = rf"$|X - \hat{{X}}|_{{{cur_feature},t+{ts + 1}}}$"
+                        title = rf"$|X - \hat{{X}}|_{{{feature_name},t+{ts + 1}}}$"
                         value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
                         cmap = "binary"
 
@@ -215,13 +212,8 @@ class Trainer:
                     ax[j, k].axis("off")
                     _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
-        for j, name in enumerate(self.feature_list):
-            cur_feature = name
-            y_hat_fj = y_hat[..., j, :].reshape(-1, 1)
-            y_fj = y[..., j, :].reshape(-1, 1)
-            rmse = np.sqrt(mean_squared_error(y_hat_fj, y_fj))
-            mae = mean_absolute_error(y_hat_fj, y_fj)
-            print(f"RMSE for {cur_feature}: {rmse}; MAE for {cur_feature}: {mae};")
+        self.calculate_matrics(y_hat, y)
+
     def evaluate(self, data_type="test"):
         if data_type == "train":
             loader = self.train_loader
@@ -240,12 +232,15 @@ class Trainer:
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
-        for i, name in enumerate(self.feature_list):
+        self.calculate_matrics(y_hat, y)
+
+    def calculate_matrics(self, y_hat, y):
+        for i, feature_name in enumerate(self.feature_list):
             y_fi = y[..., i, :].reshape(-1, 1)
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
             rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
             mae = mean_absolute_error(y_hat_fi, y_fi)
-            print(f"RMSE for f{i}: {rmse}; MAE for f{i}: {mae};")
+            print(f"RMSE for {feature_name}: {rmse}; MAE for {feature_name}: {mae};")
 
     def get_model(self):
         return self.model

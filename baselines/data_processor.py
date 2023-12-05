@@ -115,7 +115,7 @@ class DataProcessor:
             for s in range(self.samples):
                 for la in range(self.latitude):
                     for lo in range(self.longitude):
-                        if 0 < la + i < self.latitude and 0 < lo + j < self.longitude:
+                        if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
                             neigh_data[s, la, lo, n] = self.data[s, la + i, lo + j]
                         else:
                             neigh_data[s, la, lo, n] = self.data[s, la, lo]
@@ -134,18 +134,10 @@ class DataProcessor:
 
     @staticmethod
     def train_test_split(X, y, train_split=TRAIN_RATIO):
-        n = len(X)
         train_samples = int(train_split * len(X))
-        indices = sample(range(len(X)), train_samples)
-        X_train, y_train = X[indices], y[indices]
-        X_test = np.delete(X, indices, axis=0).reshape(
-            (n - train_samples,) + X_train.shape[1:]
-        )
-        y_test = np.delete(y, indices, axis=0).reshape(
-            (n - train_samples,) + y_train.shape[1:]
-        )
-        # X_train, X_test = X[:train_samples], X[train_samples:]
-        # y_train, y_test = y[:train_samples], y[train_samples:]
+        # randomness might influence the score !!!
+        X_train, X_test = X[:train_samples], X[train_samples:]
+        y_train, y_test = y[:train_samples], y[train_samples:]
         return X_train, X_test, y_train, y_test
 
     def get_latitude_longitude(self):

@@ -24,7 +24,7 @@ class SmoothingPredictor(BaselineRegressor):
         print("Not needed")
         raise KeyError
 
-    def predict_(self, X_test, y_test, alpha):
+    def predict_(self, X_test, y_test):
         X = X_test.reshape(
             -1, self.latitude, self.longitude, self.input_state, self.features
         )
@@ -50,6 +50,7 @@ class SmoothingPredictor(BaselineRegressor):
                                 .forecast(self.fh)
                             )
                         elif self.type == "holt":
+                            raise DeprecationWarning("Please use the simple type")
                             forecast = (
                                 Holt(
                                     X[i, lat, lon, :, j],

@@ -86,6 +86,10 @@ class DataProcessor:
 
         if spatial_encoding:
 
+            lsm = surface.lsm.to_numpy()
+            z = surface.z.to_numpy()
+            data = np.concatenate((data, np.stack((lsm, z), axis=-1)), axis=-1)
+
             def spatial_encode(v, norm_v, trig_func="sin"):
                 if trig_func == "sin":
                     v_encoded = np.sin(2 * np.pi * v / norm_v)

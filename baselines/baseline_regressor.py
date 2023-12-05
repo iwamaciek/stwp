@@ -78,7 +78,7 @@ class BaselineRegressor:
             if normalize:
                 y_test_i = self.scalers[i].transform(y_test_i)
                 y_hat_i = self.scalers[i].transform(y_hat_i)
-            err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
+            err = np.sqrt(mean_squared_error(y_hat_i, y_test_i))
             rmse_features.append(err)
         return rmse_features
 
@@ -90,8 +90,7 @@ class BaselineRegressor:
             if normalize:
                 y_test_i = self.scalers[i].transform(y_test_i)
                 y_hat_i = self.scalers[i].transform(y_hat_i)
-            # err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
-            err = round(mean_absolute_error(y_hat_i, y_test_i), 3)
+            err = mean_absolute_error(y_hat_i, y_test_i)
             mae_features.append(err)
         return mae_features
 
@@ -120,9 +119,7 @@ class BaselineRegressor:
                 )
                 std = np.std(y_test_sample_feature_j)
                 sqrt_n = np.sqrt(y_test_sample_feature_j.shape[0])
-                print(
-                    f"{cur_feature} => RMSE:  {round(rmse,5)}; MAE: {mae}; SE: {std / sqrt_n}"
-                )
+                print(f"{cur_feature} => RMSE:  {rmse}; MAE: {mae}; SE: {std / sqrt_n}")
 
                 for k in range(3 * self.fh):
                     ts = k // 3

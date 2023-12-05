@@ -11,6 +11,8 @@ c.retrieve(
             "10m_u_component_of_wind",
             "10m_v_component_of_wind",
             "2m_temperature",
+            "geopotential",
+            "land_sea_mask",
             "surface_pressure",
             "total_cloud_cover",
             "total_precipitation",
@@ -76,7 +78,7 @@ c.retrieve(
             25,
         ],
     },
-    "../data2021_2022.grib",
+    "../data2021-2022.grib",
 )
 
 # ~ 14min

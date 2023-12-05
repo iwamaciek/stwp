@@ -59,7 +59,7 @@ class HPO():
 
         self.best_s = sequence_length
         self.fh = 1
-        self.best_fh = self.fh
+        self.best_fh = 10000
         self.regressors = ['lasso', 'ridge', 'elastic_net']
         self.max_alpha = max_alpha
 
@@ -316,7 +316,7 @@ class HPO():
         plt.show()
 
     def plot_fh(self):
-        plt.scatter(self.sequence_plot_x, self.sequence_plot_y)
+        plt.scatter(self.fh_plot_x, self.fh_plot_y)
         plt.title("Forcasting horizon")
         plt.xlabel("fh")
         plt.ylabel("mean_rmse")

@@ -1,14 +1,72 @@
 #!/usr/bin/env python3
 import cfgrib
 import numpy as np
-from baselines.config import DATA_PATH, TRAIN_RATIO, FH
+from baselines.config import DATA_PATH, TRAIN_RATIO, INPUT_SIZE, FH, R
 
 
 class DataProcessor:
-    def __init__(self, data: np.array):
-        self.data = data
-        self.samples, self.latitude, self.longitude, self.features = data.shape
+    def __init__(self, spatial_encoding=False):
+        self.data, self.feature_list = self.load_data(spatial_encoding=spatial_encoding)
+        self.samples, self.latitude, self.longitude, self.num_features = self.data.shape
+        self.num_spatial_constants = self.num_features - len(self.feature_list)
+        self.num_features = self.num_features - self.num_spatial_constants
         self.neighbours, self.input_size = None, None
+
+    def upload_data(self, data: np.array):
+        self.data = data
+
+    def create_autoregressive_sequences(self, sequence_length=INPUT_SIZE + FH):
+        self.input_size = sequence_length
+        sequences = np.empty(
+            (
+                self.samples - self.input_size + 1,
+                self.input_size,
+                self.latitude,
+                self.longitude,
+                self.num_features + self.num_spatial_constants,
+            )
+        )
+        for i in range(self.samples - sequence_length + 1):
+            sequences[i] = self.data[i : i + sequence_length]
+        sequences = sequences.transpose((0, 2, 3, 1, 4))
+        self.samples = sequences.shape[0]
+        self.data = sequences
+
+    def create_neighbours(self, radius):
+        self.neighbours, indices = self.count_neighbours(radius=radius)
+        neigh_data = np.empty(
+            (
+                self.samples,
+                self.latitude,
+                self.longitude,
+                self.neighbours + 1,
+                self.input_size,
+                self.num_features + self.num_spatial_constants,
+            )
+        )
+        neigh_data[..., 0, :, :] = self.data
+
+        for n in range(1, self.neighbours + 1):
+            i, j = indices[n - 1]
+            for s in range(self.samples):
+                for la in range(self.latitude):
+                    for lo in range(self.longitude):
+                        if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
+                            neigh_data[s, la, lo, n] = self.data[s, la + i, lo + j]
+                        else:
+                            neigh_data[s, la, lo, n] = self.data[s, la, lo]
+
+        self.data = neigh_data
+
+    def preprocess(self, input_size=INPUT_SIZE, fh=FH, r=R, use_neighbours=False):
+        self.create_autoregressive_sequences(sequence_length=input_size + fh)
+        if use_neighbours:
+            self.create_neighbours(radius=r)
+            y = self.data[..., 0, -fh:, : self.num_features]
+        else:
+            y = self.data[..., -fh:, : self.num_features]
+        X = self.data[..., :input_size, :]
+        return X, y
 
     @staticmethod
     def load_data(path=DATA_PATH, spatial_encoding=False):
@@ -58,25 +116,13 @@ class DataProcessor:
 
         return data, feature_list
 
-    def flatten(self):
-        self.data = self.data.reshape(-1, self.latitude * self.longitude, self.features)
-
-    def create_autoregressive_sequences(self, sequence_length):
-        self.input_size = sequence_length
-        sequences = np.empty(
-            (
-                self.samples - self.input_size + 1,
-                self.input_size,
-                self.latitude,
-                self.longitude,
-                self.features,
-            )
-        )
-        for i in range(self.samples - sequence_length + 1):
-            sequences[i] = self.data[i : i + sequence_length]
-        sequences = sequences.transpose((0, 2, 3, 1, 4))
-        self.samples = sequences.shape[0]
-        self.data = sequences
+    @staticmethod
+    def train_test_split(X, y, train_split=TRAIN_RATIO):
+        train_samples = int(train_split * len(X))
+        # randomness might influence the score !!!
+        X_train, X_test = X[:train_samples], X[train_samples:]
+        y_train, y_test = y[:train_samples], y[train_samples:]
+        return X_train, X_test, y_train, y_test
 
     @staticmethod
     def count_neighbours(radius: int):
@@ -93,51 +139,3 @@ class DataProcessor:
                     count += 1
                     indices.append((x, y))
         return count, indices
-
-    def create_neighbours(self, radius):
-        # TODO make it more efficient
-        self.neighbours, indices = self.count_neighbours(radius=radius)
-        neigh_data = np.empty(
-            (
-                self.samples,
-                self.latitude,
-                self.longitude,
-                self.neighbours + 1,
-                self.input_size,
-                self.features,
-            )
-        )
-        neigh_data[..., 0, :, :] = self.data
-
-        for n in range(1, self.neighbours + 1):
-            i, j = indices[n - 1]
-            for s in range(self.samples):
-                for la in range(self.latitude):
-                    for lo in range(self.longitude):
-                        if -1 < la + i < self.latitude and -1 < lo + j < self.longitude:
-                            neigh_data[s, la, lo, n] = self.data[s, la + i, lo + j]
-                        else:
-                            neigh_data[s, la, lo, n] = self.data[s, la, lo]
-
-        self.data = neigh_data
-
-    def preprocess(self, input_size, fh=FH, r=1, use_neighbours=False):
-        self.create_autoregressive_sequences(sequence_length=input_size + fh)
-        if use_neighbours:
-            self.create_neighbours(radius=r)
-            y = self.data[..., 0, -fh:, :]
-        else:
-            y = self.data[..., -fh:, :]
-        X = self.data[..., :input_size, :]
-        return X, y
-
-    @staticmethod
-    def train_test_split(X, y, train_split=TRAIN_RATIO):
-        train_samples = int(train_split * len(X))
-        # randomness might influence the score !!!
-        X_train, X_test = X[:train_samples], X[train_samples:]
-        y_train, y_test = y[:train_samples], y[train_samples:]
-        return X_train, X_test, y_train, y_test
-
-    def get_latitude_longitude(self):
-        return self.latitude, self.longitude

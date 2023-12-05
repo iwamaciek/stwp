@@ -24,7 +24,7 @@ class BaselineRegressor:
                 self.longitude,
                 self.neighbours,
                 self.input_state,
-                self.features,
+                self.num_features,
             ) = X_shape
         else:
             (
@@ -32,12 +32,14 @@ class BaselineRegressor:
                 self.latitude,
                 self.longitude,
                 self.input_state,
-                self.features,
+                self.num_features,
             ) = X_shape
             self.neighbours = 1
 
         self.fh = fh
         self.feature_list = feature_list
+        self.num_spatial_constants = self.num_features - len(self.feature_list)
+        self.num_features = self.num_features - self.num_spatial_constants
 
         if scaler_type == "min_max":
             self.scaler = MinMaxScaler()
@@ -52,12 +54,17 @@ class BaselineRegressor:
             raise ValueError
 
         self.model = DummyRegressor()
-        self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
-        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
+        self.models = [copy.deepcopy(self.model) for _ in range(self.num_features)]
+        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.num_features)]
 
     def train(self, X_train, y_train, normalize=False):
-        X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
-        for i in range(self.features):
+        X = X_train.reshape(
+            -1,
+            self.neighbours
+            * self.input_state
+            * (self.num_features + self.num_spatial_constants),
+        )
+        for i in range(self.num_features):
             yi = y_train[..., 0, i].reshape(-1, 1)
             if normalize:
                 self.scalers[i].fit(yi)
@@ -65,7 +72,7 @@ class BaselineRegressor:
 
     def get_rmse(self, y_hat, y_test, normalize=False):
         rmse_features = []
-        for i in range(self.features):
+        for i in range(self.num_features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
             y_test_i = y_test[..., i].reshape(-1, 1)
             if normalize:
@@ -77,7 +84,7 @@ class BaselineRegressor:
 
     def get_mae(self, y_hat, y_test, normalize=False):
         mae_features = []
-        for i in range(self.features):
+        for i in range(self.num_features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
             y_test_i = y_test[..., i].reshape(-1, 1)
             if normalize:
@@ -95,10 +102,12 @@ class BaselineRegressor:
         for i in range(max_samples):
             y_test_sample, y_hat_sample = y_test[i], y_hat[i]
             fig, ax = plt.subplots(
-                self.features, 3 * self.fh, figsize=(10 * self.fh, 3 * self.features)
+                self.num_features,
+                3 * self.fh,
+                figsize=(10 * self.fh, 3 * self.num_features),
             )
 
-            for j in range(self.features):
+            for j in range(self.num_features):
                 cur_feature = self.feature_list[j]
                 y_test_sample_feature_j = y_test_sample[..., j].reshape(-1, 1)
                 y_hat_sample_feature_j = y_hat_sample[..., j].reshape(-1, 1)
@@ -136,10 +145,15 @@ class BaselineRegressor:
             plt.show()
 
     def predict_(self, X_test, y_test):
-        X = X_test.reshape(-1, self.neighbours * self.input_state * self.features)
+        X = X_test.reshape(
+            -1,
+            self.neighbours
+            * self.input_state
+            * (self.num_features + self.num_spatial_constants),
+        )
         if self.fh == 1:
             y_hat = []
-            for i in range(self.features):
+            for i in range(self.num_features):
                 y_hat_i = (
                     self.models[i]
                     .predict(X)
@@ -161,7 +175,7 @@ class BaselineRegressor:
         print("=======================================")
 
         sqrt_n = np.sqrt(y_test.shape[0] * self.latitude * self.longitude * self.fh)
-        for i in range(self.features):
+        for i in range(self.num_features):
             print(
                 f"{self.feature_list[i]} => RMSE: {eval_scores[i]};  MAE: {mae_scores[i]}; SE: {np.std(y_test[...,i]) / sqrt_n}"
             )
@@ -188,7 +202,13 @@ class BaselineRegressor:
         for i in range(num_samples):
             Xi = X_test[i]
             Yik = np.empty(
-                (self.latitude, self.longitude, self.neighbours, self.fh, self.features)
+                (
+                    self.latitude,
+                    self.longitude,
+                    self.neighbours,
+                    self.fh,
+                    self.num_features,
+                )
             )
             for k in range(-1, self.fh - 1):
                 Xik = Xi
@@ -202,12 +222,13 @@ class BaselineRegressor:
                         Xik = np.concatenate(
                             (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=-2
                         )
-                for j in range(self.features):
+                for j in range(self.num_features):
                     y_hat[i, ..., k + 1, j] = (
                         self.models[j]
                         .predict(
                             Xik.reshape(
-                                -1, self.neighbours * self.input_state * self.features
+                                -1,
+                                self.neighbours * self.input_state * self.num_features,
                             )
                         )
                         .reshape(1, self.latitude, self.longitude)
@@ -231,7 +252,7 @@ class BaselineRegressor:
 
         _, indices = DataProcessor.count_neighbours(radius=radius)
         Y_out = np.empty(
-            (self.latitude, self.longitude, self.neighbours, self.features)
+            (self.latitude, self.longitude, self.neighbours, self.num_features)
         )
         Y_out[..., 0, :] = Y
         for n in range(1, self.neighbours):

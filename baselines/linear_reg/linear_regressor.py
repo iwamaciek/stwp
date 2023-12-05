@@ -27,4 +27,4 @@ class LinearRegressor(BaselineRegressor):
             print(f"{regressor_type} regressor not implemented")
             raise ValueError
 
-        self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
+        self.models = [copy.deepcopy(self.model) for _ in range(self.num_features)]

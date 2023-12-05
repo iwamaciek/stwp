@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from baselines.baseline_regressor import BaselineRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, MaxAbsScaler
 import copy
 
 
@@ -12,7 +11,6 @@ class LinearRegressor(BaselineRegressor):
         fh,
         feature_list,
         regressor_type="linear",
-        scaler_type="min_max",
         alpha=1.0,
     ):
         super().__init__(X_shape, fh, feature_list)
@@ -29,15 +27,4 @@ class LinearRegressor(BaselineRegressor):
             print(f"{regressor_type} regressor not implemented")
             raise ValueError
 
-        if scaler_type == "min_max":
-            self.scaler = MinMaxScaler()
-        elif scaler_type == "standard":
-            self.scaler = StandardScaler()
-        elif scaler_type == "max_abs":
-            self.scaler = MaxAbsScaler()
-        else:
-            print(f"{scaler_type} scaler not implemented")
-            raise ValueError
-
         self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
-        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]

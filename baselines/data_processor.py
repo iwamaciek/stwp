@@ -2,7 +2,6 @@
 import cfgrib
 import numpy as np
 from baselines.config import DATA_PATH, TRAIN_RATIO, FH
-from random import sample
 
 
 class DataProcessor:

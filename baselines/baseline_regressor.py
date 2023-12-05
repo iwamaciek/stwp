@@ -13,7 +13,7 @@ class BaselineRegressor:
         self,
         X_shape: tuple,
         fh: int,
-        feature_list: list,
+        feature_list: list
     ):
         if len(X_shape) > 5:
             (

@@ -11,9 +11,9 @@ from sklearn.preprocessing import (
 
 
 class LightGBMRegressor(BaselineRegressor):
-    def __init__(self, X_shape, fh, feature_list, scaler_type="robust"):
+    def __init__(self, X_shape, fh, feature_list, scaler_type="robust", **kwargs):
         super().__init__(X_shape, fh, feature_list)
-        self.model = LGBMRegressor(verbose=-1)
+        self.model = LGBMRegressor(verbose=-1, **kwargs)
 
         if scaler_type == "min_max":
             self.scaler = MinMaxScaler()

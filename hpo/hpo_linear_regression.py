@@ -19,25 +19,6 @@ class InvalidBaselineException(Exception):
     "Raised when baseline type in invalid"
     pass
 
-def load_data(data_path):
-
-    grib_data = cfgrib.open_datasets(data_path)
-    surface = grib_data[0] 
-    hybrid = grib_data[1] 
-
-
-    
-    t2m = surface.t2m.to_numpy() - 273.15  # -> C
-    sp = surface.sp.to_numpy() / 100       # -> hPa
-    tcc = surface.tcc.to_numpy()
-    u10 = surface.u10.to_numpy()
-    v10 = surface.v10.to_numpy()
-    tp = hybrid.tp.to_numpy().reshape((-1,) + hybrid.tp.shape[2:])
-    data = np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
-
-    return data
-
-
 
 def objective(trial, baseline_type, data, feature_list, use_neighbours=False, max_sequence_length=8 , max_alpha=2.1, regressors=['lasso', 'ridge', 'elastic_net']):
     try:
@@ -88,11 +69,17 @@ def run_study(baseline_type, n_trials, data, feature_list, objective_function=ob
     # best_neighbour = study.best_params['use_neighbours']
 
 
+    trial_with_highest_accuracy = max(study.best_trials, key=lambda t: t.values[1])
+
+
+
     print('Best hyperparameters:')
-    print(f"Best input window: {best_s}")
+    print(f"Best sequence_length: {best_s}")
     print(f"Best regressor type: {best_regressor_type}")
     print(f"Best regularization constant: {best_alpha}")
     # print(f"Best use_neighbours value: {best_neighbour}")
+    print(f"Params: {trial_with_highest_accuracy.params}")
+
 
     return best_s, best_regressor_type, best_alpha
 
@@ -117,8 +104,8 @@ def write_stats_to_file(file_name, baseline_type, n_trials, use_neighbours, best
         file.write(f"Best regularization constant: {best_alpha}\n")
         file.write("_____________________________________________\n")
 
-def run_hpo(data_path, baseline_type, n_trials, use_neighbours, file_name, feature_list):
-    data = load_data(data_path)
+def run_hpo(data_path, baseline_type, n_trials, use_neighbours, file_name):
+    data, feature_list = DataProcessor.load_data(data_path)
 
     best_s, best_regressor_type, best_alpha = run_study(baseline_type, n_trials, data, feature_list)
 
@@ -126,7 +113,7 @@ def run_hpo(data_path, baseline_type, n_trials, use_neighbours, file_name, featu
 
 
 if __name__ == "__main__":
-    data_path = '../data2022.grib'
+    data_path = '../../data2022_full.grib'
 
     baseline_type = sys.argv[1]
     n_trials = int(sys.argv[2])
@@ -134,7 +121,5 @@ if __name__ == "__main__":
 
     file_name = 'hpo_linear_regression_results.txt'
 
-    feature_list = ['t2m', 'sp', 'tcc', 'u10', 'v10', 'tp']
-
-    run_hpo(data_path, baseline_type, n_trials, use_neighbours, file_name, feature_list)
+    run_hpo(data_path, baseline_type, n_trials, use_neighbours, file_name)
     

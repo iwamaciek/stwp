@@ -38,3 +38,11 @@ Best input window: 6
 Best regressor type: ridge
 Best regularization constant: 0.5117557928701486
 _____________________________________________
+29-11-2023 18:55:S
+Used baseline: simple-linearNumber of trials: 5
+Neighbours used: No
+Best hyperparameters:
+Best input window: 6
+Best regressor type: ridge
+Best regularization constant: 0.13449345819652325
+_____________________________________________

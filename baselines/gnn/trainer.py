@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import time
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
 from baselines.config import DEVICE, FH, BATCH_SIZE
 from baselines.gnn.callbacks import (
@@ -72,10 +71,9 @@ class Trainer:
         # self.optimizer = torch.optim.AdamW(
         #     self.model.parameters(), betas=(0.9, 0.95), weight_decay=0.1, lr=self.lr
         # )
-        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=self.gamma)
 
         # Callbacks
-        self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler)
+        self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
         self.early_stop_callback = EarlyStoppingCallback()
 

@@ -193,6 +193,7 @@ class BaselineRegressor:
         ...
         (Xi+k-1, ..., Yi+n+k-2 ,Yi+n+k-1) -> Yi+n+k
 
+        Autoregression not supported for spatial encoding!
         """
         y_hat = np.empty(y_test.shape)
         num_samples = X_test.shape[0]
@@ -210,14 +211,24 @@ class BaselineRegressor:
             for k in range(-1, self.fh - 1):
                 Xik = Xi
                 if k > -1:
+                    if self.fh - self.input_state < 2:
+                        autoreg_start = 0
+                    else:
+                        autoreg_start = max(0, k - self.input_state + 1)
+
                     if self.neighbours > 1:
                         Yik[..., k, :] = self.extend(y_hat[i, ..., k, :])
                         Xik = np.concatenate(
-                            (Xi[..., k + 1 :, :], Yik[..., : k + 1, :]), axis=-2
+                            (Xi[..., k + 1 :, :], Yik[..., autoreg_start : k + 1, :]),
+                            axis=-2,
                         )
                     else:
                         Xik = np.concatenate(
-                            (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=-2
+                            (
+                                Xi[..., k + 1 :, :],
+                                y_hat[i, ..., autoreg_start : k + 1, :],
+                            ),
+                            axis=-2,
                         )
                 for j in range(self.num_features):
                     y_hat[i, ..., k + 1, j] = (

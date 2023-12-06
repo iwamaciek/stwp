@@ -72,19 +72,32 @@ class SimpleLinearRegressor(BaselineRegressor):
                     .reshape(1, self.latitude, self.longitude)
                 )
                 for k in range(self.fh - 1):
+                    # print("Xij before conc", Xij.shape)
+                    if self.fh - self.input_state < 2:
+                        autoreg_start = 0
+                    else:
+                        autoreg_start = max(0, k - self.input_state + 1)
+
                     if self.neighbours > 1:
                         Xij = np.concatenate(
                             (
                                 X_test[i, ..., k + 1 :, j],
-                                self.extend(y_hat_ij[..., : k + 1]),
+                                self.extend(y_hat_ij[..., autoreg_start : k + 1]),
                             ),
                             axis=3,
                         )
                     else:
                         Xij = np.concatenate(
-                            (X_test[i, ..., k + 1 :, j], y_hat_ij[..., : k + 1]), axis=2
+                            (
+                                X_test[i, ..., k + 1 :, j],
+                                y_hat_ij[..., autoreg_start : k + 1],
+                            ),
+                            axis=2,
                         )
+                    # print("Xij after conc", Xij.shape)
                     Xij = Xij.reshape(-1, self.neighbours * self.input_state)
+                    # print("Xij before predict", Xij.shape)
+                    # print("We need:",  y_hat_ij[..., k + 1].shape)
                     y_hat_ij[..., k + 1] = (
                         self.models[j]
                         .predict(Xij)

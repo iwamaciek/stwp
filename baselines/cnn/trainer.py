@@ -55,6 +55,7 @@ class Trainer(GNNTrainer):
         start = time.time()
 
         for epoch in range(num_epochs):
+            gradient_clip = 32
             self.model.train()
             total_loss = 0
             for batch in self.train_loader:
@@ -66,6 +67,7 @@ class Trainer(GNNTrainer):
 
                 loss = self.criterion(outputs, labels)
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
                 self.optimizer.step()
                 total_loss += loss.item()
 

@@ -3,11 +3,11 @@ import torch
 
 
 class LRAdjustCallback:
-    def __init__(self, optimizer, scheduler, patience=7, epsilon=1e-3):
+    def __init__(self, optimizer, patience=7, epsilon=1e-3, gamma=0.5):
         self.optimizer = optimizer
-        self.scheduler = scheduler
         self.patience = patience
         self.epsilon = epsilon
+        self.gamma = gamma
         self.counter = 0
         self.best_loss = np.inf
 
@@ -24,7 +24,7 @@ class LRAdjustCallback:
 
     def adjust_learning_rate(self):
         for param_group in self.optimizer.param_groups:
-            param_group["lr"] *= 0.5
+            param_group["lr"] *= self.gamma
 
 
 class CkptCallback:

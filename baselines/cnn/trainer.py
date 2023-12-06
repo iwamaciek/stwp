@@ -7,12 +7,11 @@ from baselines.gnn.callbacks import (
     EarlyStoppingCallback,
 )
 from baselines.gnn.trainer import Trainer as GNNTrainer
-from torch.optim.lr_scheduler import StepLR
 import torch
 import time
 
 class Trainer(GNNTrainer):
-    def __init__(self, base_units=16, lr=0.001, gamma=0.001, subset=None) -> None:
+    def __init__(self, base_units=16, lr=0.001, gamma=0.5, subset=None) -> None:
         self.data_processor = CNNDataProcessor()
         self.data_processor.preprocess(subset=subset)
         self.train_loader = self.data_processor.train_loader
@@ -43,12 +42,11 @@ class Trainer(GNNTrainer):
         self.lr = lr
         self.gamma = gamma
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-        self.scheduler = StepLR(self.optimizer, step_size=100, gamma=self.gamma)
 
         # Callbacks
-        self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler, epsilon=0.01)
+        self.lr_callback = LRAdjustCallback(self.optimizer, epsilon=0.01, patience=20, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
-        self.early_stop_callback = EarlyStoppingCallback(patience=100)
+        self.early_stop_callback = EarlyStoppingCallback(patience=60)
         
     def train(self, num_epochs=100):
         train_loss_list = []
@@ -73,7 +71,7 @@ class Trainer(GNNTrainer):
 
             avg_loss = total_loss / (self.subset * BATCH_SIZE)
             last_lr = self.optimizer.param_groups[0]["lr"]
-            print(f"Epoch {epoch+1}/{num_epochs}:\nTrain Loss: {avg_loss:.4f}, Last LR: {last_lr:.4f}")
+            print(f"Epoch {epoch+1}/{num_epochs}:\nTrain Loss: {avg_loss}, Last LR: {last_lr}")
             train_loss_list.append(avg_loss)
 
             self.model.eval()
@@ -87,7 +85,7 @@ class Trainer(GNNTrainer):
                     val_loss += loss.item()
 
             avg_val_loss = val_loss / (min(self.subset, self.test_size) * BATCH_SIZE)
-            print(f"Val Loss: {avg_val_loss:.4f}\n---------")
+            print(f"Val Loss: {avg_val_loss}\n---------")
             val_loss_list.append(avg_val_loss)
 
             self.lr_callback.step(val_loss)

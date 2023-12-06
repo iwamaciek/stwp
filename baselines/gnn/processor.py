@@ -3,9 +3,13 @@ import torch
 import torch_geometric.data as data
 import copy
 import sys
-from torch.utils.data import RandomSampler
 from torch_geometric.loader import DataLoader
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    StandardScaler,
+    RobustScaler,
+    MaxAbsScaler,
+)
 from sklearn.utils import shuffle
 from baselines.config import (
     DEVICE,
@@ -20,9 +24,9 @@ from baselines.data_processor import DataProcessor
 
 
 class NNDataProcessor:
-    def __init__(self):
+    def __init__(self, spatial_encoding=False):
         self.dataset, self.feature_list = DataProcessor.load_data(
-            spatial_encoding=False
+            spatial_encoding=spatial_encoding
         )
         (
             self.num_samples,
@@ -31,11 +35,16 @@ class NNDataProcessor:
             self.num_features,
         ) = self.dataset.shape
 
+        self.spatial_encoding = spatial_encoding
+        self.num_spatial_constants = self.num_features - len(self.feature_list)
+        self.num_features = self.num_features - self.num_spatial_constants
+
         self.train_loader = None
         self.test_loader = None
 
         self.train_size = None
         self.test_size = None
+        self.scaler = None
         self.scalers = None
         self.edge_weights = None
         self.edge_index = None
@@ -44,11 +53,11 @@ class NNDataProcessor:
     def preprocess(self, subset=None):
         self.edge_index, self.edge_weights, self.edge_attr = self.create_edges()
         X_train, X_test, y_train, y_test = self.train_test_split()
-        X, y = self.get_scalers(X_train, X_test, y_train, y_test)
+        X, y = self.fit_transform_scalers(X_train, X_test, y_train, y_test)
         self.train_loader, self.test_loader = self.get_loaders(X, y, subset)
 
     def train_test_split(self):
-        processor = DataProcessor(self.dataset)
+        processor = DataProcessor(spatial_encoding=self.spatial_encoding)
         X, y = processor.preprocess(INPUT_SIZE, FH)
 
         self.num_samples = X.shape[0]
@@ -56,23 +65,35 @@ class NNDataProcessor:
         self.test_size = self.num_samples - self.train_size
 
         X = X.reshape(
-            -1, self.num_latitudes * self.num_longitudes * INPUT_SIZE, self.num_features
+            -1,
+            self.num_latitudes * self.num_longitudes * INPUT_SIZE,
+            self.num_features + self.num_spatial_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
         )
 
-        X_train, X_test = X[: self.train_size], X[-self.test_size :]
-        y_train, y_test = y[: self.train_size], y[-self.test_size :]
+        return DataProcessor.train_test_split(X, y)
 
-        return X_train, X_test, y_train, y_test
-
-    def get_scalers(self, X_train, X_test, y_train, y_test):
+    def fit_transform_scalers(
+        self, X_train, X_test, y_train, y_test, scaler_type="standard"
+    ):
         self.train_size = len(X_train)
         self.test_size = len(X_test)
 
-        scaler = StandardScaler()
-        self.scalers = [copy.deepcopy(scaler) for _ in range(self.num_features)]
+        if scaler_type == "min_max":
+            self.scaler = MinMaxScaler()
+        elif scaler_type == "standard":
+            self.scaler = StandardScaler()
+        elif scaler_type == "max_abs":
+            self.scaler = MaxAbsScaler()
+        elif scaler_type == "robust":
+            self.scaler = RobustScaler()
+        else:
+            print(f"{scaler_type} scaler not implemented")
+            raise ValueError
+
+        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.num_features)]
 
         Xi_shape = self.num_latitudes * self.num_longitudes * INPUT_SIZE
         yi_shape = self.num_latitudes * self.num_longitudes * FH
@@ -105,7 +126,10 @@ class NNDataProcessor:
         y = np.concatenate((y_train, y_test), axis=0)
 
         X = X.reshape(
-            -1, self.num_latitudes * self.num_longitudes, INPUT_SIZE, self.num_features
+            -1,
+            self.num_latitudes * self.num_longitudes,
+            INPUT_SIZE,
+            self.num_features + self.num_spatial_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes, FH, self.num_features
@@ -257,5 +281,5 @@ class NNDataProcessor:
             self.num_samples,
             self.num_latitudes,
             self.num_longitudes,
-            self.num_features,
+            self.num_features + self.num_spatial_constants,
         )

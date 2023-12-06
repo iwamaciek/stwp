@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import time
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
 from baselines.config import DEVICE, FH, BATCH_SIZE
 from baselines.gnn.callbacks import (
@@ -20,19 +19,19 @@ from baselines.gnn.basic_gcn import BasicGCN
 
 class Trainer:
     def __init__(
-        self, architecture="a3tgcn", hidden_dim=64, lr=0.01, gamma=0.5, subset=None
+        self, architecture="cgcn", hidden_dim=64, lr=0.01, gamma=0.5, subset=None
     ):
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
         # If subset param is given train_data and test_data will have len=subset
-        self.nn_proc = NNDataProcessor()
+        self.nn_proc = NNDataProcessor(spatial_encoding=True)
         self.nn_proc.preprocess(subset=subset)
         self.train_loader = self.nn_proc.train_loader
         self.test_loader = self.nn_proc.test_loader
         self.feature_list = self.nn_proc.feature_list
         self.features = len(self.feature_list)
-        (_, self.latitude, self.longitude, accum_features) = self.nn_proc.get_shapes()
-        self.constants = accum_features - self.features
+        (_, self.latitude, self.longitude, self.constants) = self.nn_proc.get_shapes()
+        self.constants = self.constants - self.features
         self.edge_index = self.nn_proc.edge_index
         self.edge_weights = self.nn_proc.edge_weights
         self.edge_attr = self.nn_proc.edge_attr
@@ -68,14 +67,13 @@ class Trainer:
         self.criterion = lambda output, target: (output - target).pow(2).sum()
         self.lr = lr
         self.gamma = gamma
-        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-        self.optimizer = torch.optim.AdamW(
-            self.model.parameters(), betas=(0.9, 0.95), weight_decay=0.1, lr=self.lr
-        )
-        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=self.gamma)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        # self.optimizer = torch.optim.AdamW(
+        #     self.model.parameters(), betas=(0.9, 0.95), weight_decay=0.1, lr=self.lr
+        # )
 
         # Callbacks
-        self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler)
+        self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
         self.early_stop_callback = EarlyStoppingCallback()
 
@@ -83,7 +81,7 @@ class Trainer:
         self.model.load_state_dict(torch.load(path))
 
     def train(self, num_epochs=50):
-        gradient_clip = 32
+        # gradient_clip = 32
         start = time.time()
 
         val_loss_list = []
@@ -98,7 +96,7 @@ class Trainer:
                 loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
                 loss.backward()
 
-                nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
 
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -169,8 +167,6 @@ class Trainer:
         return y, y_hat
 
     def plot_predictions(self, data_type="test"):
-        # TODO
-        # for now it is just hard-coded as first train or test sample
         if data_type == "train":
             sample = next(iter(self.train_loader))
         elif data_type == "test":

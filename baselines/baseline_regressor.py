@@ -24,7 +24,7 @@ class BaselineRegressor:
                 self.longitude,
                 self.neighbours,
                 self.input_state,
-                self.features,
+                self.num_features,
             ) = X_shape
         else:
             (
@@ -32,12 +32,14 @@ class BaselineRegressor:
                 self.latitude,
                 self.longitude,
                 self.input_state,
-                self.features,
+                self.num_features,
             ) = X_shape
             self.neighbours = 1
 
         self.fh = fh
         self.feature_list = feature_list
+        self.num_spatial_constants = self.num_features - len(self.feature_list)
+        self.num_features = self.num_features - self.num_spatial_constants
 
         if scaler_type == "min_max":
             self.scaler = MinMaxScaler()
@@ -52,12 +54,17 @@ class BaselineRegressor:
             raise ValueError
 
         self.model = DummyRegressor()
-        self.models = [copy.deepcopy(self.model) for _ in range(self.features)]
-        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.features)]
+        self.models = [copy.deepcopy(self.model) for _ in range(self.num_features)]
+        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.num_features)]
 
     def train(self, X_train, y_train, normalize=False):
-        X = X_train.reshape(-1, self.neighbours * self.input_state * self.features)
-        for i in range(self.features):
+        X = X_train.reshape(
+            -1,
+            self.neighbours
+            * self.input_state
+            * (self.num_features + self.num_spatial_constants),
+        )
+        for i in range(self.num_features):
             yi = y_train[..., 0, i].reshape(-1, 1)
             if normalize:
                 self.scalers[i].fit(yi)
@@ -65,26 +72,25 @@ class BaselineRegressor:
 
     def get_rmse(self, y_hat, y_test, normalize=False):
         rmse_features = []
-        for i in range(self.features):
+        for i in range(self.num_features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
             y_test_i = y_test[..., i].reshape(-1, 1)
             if normalize:
                 y_test_i = self.scalers[i].transform(y_test_i)
                 y_hat_i = self.scalers[i].transform(y_hat_i)
-            err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
+            err = np.sqrt(mean_squared_error(y_hat_i, y_test_i))
             rmse_features.append(err)
         return rmse_features
 
     def get_mae(self, y_hat, y_test, normalize=False):
         mae_features = []
-        for i in range(self.features):
+        for i in range(self.num_features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
             y_test_i = y_test[..., i].reshape(-1, 1)
             if normalize:
                 y_test_i = self.scalers[i].transform(y_test_i)
                 y_hat_i = self.scalers[i].transform(y_hat_i)
-            # err = round(np.sqrt(mean_squared_error(y_hat_i, y_test_i)), 3)
-            err = round(mean_absolute_error(y_hat_i, y_test_i), 3)
+            err = mean_absolute_error(y_hat_i, y_test_i)
             mae_features.append(err)
         return mae_features
 
@@ -95,10 +101,12 @@ class BaselineRegressor:
         for i in range(max_samples):
             y_test_sample, y_hat_sample = y_test[i], y_hat[i]
             fig, ax = plt.subplots(
-                self.features, 3 * self.fh, figsize=(10 * self.fh, 3 * self.features)
+                self.num_features,
+                3 * self.fh,
+                figsize=(10 * self.fh, 3 * self.num_features),
             )
 
-            for j in range(self.features):
+            for j in range(self.num_features):
                 cur_feature = self.feature_list[j]
                 y_test_sample_feature_j = y_test_sample[..., j].reshape(-1, 1)
                 y_hat_sample_feature_j = y_hat_sample[..., j].reshape(-1, 1)
@@ -111,9 +119,7 @@ class BaselineRegressor:
                 )
                 std = np.std(y_test_sample_feature_j)
                 sqrt_n = np.sqrt(y_test_sample_feature_j.shape[0])
-                print(
-                    f"{cur_feature} => RMSE:  {round(rmse,5)}; MAE: {mae}; SE: {std / sqrt_n}"
-                )
+                print(f"{cur_feature} => RMSE:  {rmse}; MAE: {mae}; SE: {std / sqrt_n}")
 
                 for k in range(3 * self.fh):
                     ts = k // 3
@@ -136,10 +142,15 @@ class BaselineRegressor:
             plt.show()
 
     def predict_(self, X_test, y_test):
-        X = X_test.reshape(-1, self.neighbours * self.input_state * self.features)
+        X = X_test.reshape(
+            -1,
+            self.neighbours
+            * self.input_state
+            * (self.num_features + self.num_spatial_constants),
+        )
         if self.fh == 1:
             y_hat = []
-            for i in range(self.features):
+            for i in range(self.num_features):
                 y_hat_i = (
                     self.models[i]
                     .predict(X)
@@ -161,7 +172,7 @@ class BaselineRegressor:
         print("=======================================")
 
         sqrt_n = np.sqrt(y_test.shape[0] * self.latitude * self.longitude * self.fh)
-        for i in range(self.features):
+        for i in range(self.num_features):
             print(
                 f"{self.feature_list[i]} => RMSE: {eval_scores[i]};  MAE: {mae_scores[i]}; SE: {np.std(y_test[...,i]) / sqrt_n}"
             )
@@ -182,32 +193,50 @@ class BaselineRegressor:
         ...
         (Xi+k-1, ..., Yi+n+k-2 ,Yi+n+k-1) -> Yi+n+k
 
+        Autoregression not supported for spatial encoding!
         """
         y_hat = np.empty(y_test.shape)
         num_samples = X_test.shape[0]
         for i in range(num_samples):
             Xi = X_test[i]
             Yik = np.empty(
-                (self.latitude, self.longitude, self.neighbours, self.fh, self.features)
+                (
+                    self.latitude,
+                    self.longitude,
+                    self.neighbours,
+                    self.fh,
+                    self.num_features,
+                )
             )
             for k in range(-1, self.fh - 1):
                 Xik = Xi
                 if k > -1:
+                    if self.fh - self.input_state < 2:
+                        autoreg_start = 0
+                    else:
+                        autoreg_start = max(0, k - self.input_state + 1)
+
                     if self.neighbours > 1:
                         Yik[..., k, :] = self.extend(y_hat[i, ..., k, :])
                         Xik = np.concatenate(
-                            (Xi[..., k + 1 :, :], Yik[..., : k + 1, :]), axis=-2
+                            (Xi[..., k + 1 :, :], Yik[..., autoreg_start : k + 1, :]),
+                            axis=-2,
                         )
                     else:
                         Xik = np.concatenate(
-                            (Xi[..., k + 1 :, :], y_hat[i, ..., : k + 1, :]), axis=-2
+                            (
+                                Xi[..., k + 1 :, :],
+                                y_hat[i, ..., autoreg_start : k + 1, :],
+                            ),
+                            axis=-2,
                         )
-                for j in range(self.features):
+                for j in range(self.num_features):
                     y_hat[i, ..., k + 1, j] = (
                         self.models[j]
                         .predict(
                             Xik.reshape(
-                                -1, self.neighbours * self.input_state * self.features
+                                -1,
+                                self.neighbours * self.input_state * self.num_features,
                             )
                         )
                         .reshape(1, self.latitude, self.longitude)
@@ -231,7 +260,7 @@ class BaselineRegressor:
 
         _, indices = DataProcessor.count_neighbours(radius=radius)
         Y_out = np.empty(
-            (self.latitude, self.longitude, self.neighbours, self.features)
+            (self.latitude, self.longitude, self.neighbours, self.num_features)
         )
         Y_out[..., 0, :] = Y
         for n in range(1, self.neighbours):

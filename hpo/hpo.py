@@ -32,13 +32,13 @@ class HPO:
         n_trials,
         dataset,
         use_neighbours=False,
-        # max_sequence_length = 15,
         sequence_length=1,
         sequence_n_trials=15,
         sequence_alpha=5,
         sequence_regressor="ridge",
         fh_n_trials=15,
         max_alpha=10,
+        engine='optuna'
     ):
         self.baseline_type = baseline_type
         self.n_trials = n_trials
@@ -54,8 +54,9 @@ class HPO:
         self.best_fh = 10000
         self.regressors = ['lasso', 'ridge', 'elastic_net']
         self.max_alpha = max_alpha
-        self.verbosity = False
+        self.verbosity = True
         self.params = {}
+        self.engine = engine
 
         self.sequence_plot_x = []
         self.sequence_plot_y = []
@@ -171,6 +172,11 @@ class HPO:
                 else:
                     raise InvalidBaselineException
 
+
+
+                if(self.verbosity == True):
+                    print(f"s: {s} => mean_rmse {mean_rmse}")
+                
                 self.sequence_plot_x.append(s)
                 self.sequence_plot_y.append(mean_rmse)
 
@@ -179,29 +185,30 @@ class HPO:
                     best_s = s
 
             self.best_s = best_s
+            print(f'best_s : {best_s}')
 
         except InvalidBaselineException:
             print(
                 "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
             )
 
-    def determine_best_fh(self, max_sequence_lenght=15):
+    def determine_best_fh(self):
         try:
-            self.clear_sequence_plot()
-            best_s = 0
+            max_fh_length = self.best_s + 1
+            self.clear_fh_plot()
+            best_fh= 0
             max_rmse = np.inf
 
-            for s in range(1, max_sequence_lenght + 1):
+            for fh in range(1, max_fh_length):
                 processor = DataProcessor(self.data)
-                X, y = processor.preprocess(s, self.fh, self.use_neighbours)
+                X, y = processor.preprocess(self.best_s, fh, self.use_neighbours)
                 X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
                 if self.baseline_type == "simple-linear":
                     linearreg = SimpleLinearRegressor(
                         X.shape,
-                        self.fh,
+                        fh,
                         self.feature_list,
-                        regressor_type=self.sequence_regressor,
-                        alpha=self.sequence_alpha,
+                        **self.params
                     )
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
@@ -210,32 +217,36 @@ class HPO:
                 elif self.baseline_type == "linear":
                     linearreg = LinearRegressor(
                         X.shape,
-                        self.fh,
+                        fh,
                         self.feature_list,
-                        regressor_type=self.sequence_regressor,
-                        alpha=self.sequence_alpha,
+                        **self.params
                     )
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "lgbm":
-                    regressor = LightGBMRegressor(X.shape, self.fh, self.feature_list)
+                    regressor = LightGBMRegressor(X.shape, fh, self.feature_list, **self.params)
                     regressor.train(X_train, y_train, normalize=True)
                     y_hat = regressor.predict_(X_test, y_test)
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
                     mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException
+                
 
-                self.sequence_plot_x.append(s)
-                self.sequence_plot_y.append(mean_rmse)
+                if(self.verbosity == True):
+                    print(f"fh: {fh} => mean_rmse {mean_rmse}")
+
+                self.fh_plot_x.append(fh)
+                self.fh_plot_y.append(mean_rmse)
 
                 if mean_rmse < max_rmse:
                     max_rmse = mean_rmse
-                    best_s = s
+                    best_fh = fh
 
-            self.best_s = best_s
+            self.best_fh = best_fh
+            print(f'best_fh : {best_fh}')
 
         except InvalidBaselineException:
             print(
@@ -310,8 +321,9 @@ class HPO:
 
         return mean_rmse
 
-    def fh_objective(self, trial, max_fh=5):
+    def fh_objective(self, trial):
         try:
+            max_fh = self.best_s + 1
             fh = trial.suggest_int("fh", 1, max_fh)
 
             processor = DataProcessor(self.data)
@@ -378,19 +390,61 @@ class HPO:
     def run_fh_study(self):
         self.clear_fh_plot()
         study = optuna.create_study(direction="minimize")
-        study.optimize(self.fh_objective, n_trials=self.sequence_n_trials)
+        study.optimize(self.fh_objective, n_trials=self.fh_n_trials)
         if self.verbosity == False:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         self.best_fh = study.best_params["fh"]
         print("Forcasting horizon study finished.")
 
+    def run_best_params(self):
+        try:
+            processor = DataProcessor(self.data)
+            X, y = processor.preprocess(self.best_s, self.best_fh, self.use_neighbours)
+            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+
+            if self.baseline_type == "simple-linear":
+                linearreg = SimpleLinearRegressor(
+                    X.shape, self.best_fh, self.feature_list, **self.params
+                )
+                linearreg.train(X_train, y_train, normalize=False)
+                _ = linearreg.predict_and_evaluate(X_test, y_test, max_samples=1)
+            elif self.baseline_type == "linear":
+                linearreg = LinearRegressor(
+                    X.shape, self.best_fh, self.feature_list, **self.params
+                )
+                linearreg.train(X_train, y_train, normalize=False)
+                _ = linearreg.predict_and_evaluate(X_test, y_test, max_samples=1)
+            elif self.baseline_type == "lgbm":
+                regressor = LightGBMRegressor(
+                    X.shape, self.best_fh, self.feature_list, **self.params
+                )
+                regressor.train(X_train, y_train, normalize=False)
+                _ = regressor.predict_and_evaluate(X_test, y_test, max_samples=1)
+            else:
+                raise InvalidBaselineException
+
+        except InvalidBaselineException:
+            print(
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
+            )
+
     def run_full_study(self):
-        # self.run_sequence_study()
-        self.best_s = 3
-        self.run_study()
-        self.write_params_to_json()
-        # self.run_fh_study()
+        if(self.engine == 'optuna'):
+            self.run_sequence_study()
+            # self.best_s = 3
+            self.run_study()
+            self.write_params_to_json()
+            self.run_fh_study()
+        elif(self.engine == 'greed'):
+            self.determine_best_s()
+            self.run_study()
+            self.write_params_to_json()
+            self.determine_best_fh()
+        else:
+            print('Incorrect engine')
+            
+
 
     def report(self):
         self.plot_sequence()
@@ -398,20 +452,25 @@ class HPO:
         self.print_parameters()
         self.plot_fh()
         print(f"Best fh=> {self.best_fh}")
+        self.run_best_params()
 
     def run_and_report(self):
         self.run_full_study()
         self.report()
 
     def plot_sequence(self):
-        plt.scatter(self.sequence_plot_x, self.sequence_plot_y)
+        tmp = {self.sequence_plot_x[i] : self.sequence_plot_y[i] for i in range(len(self.sequence_plot_x))}
+        tmp = dict(sorted(tmp.items()))
+        plt.plot(tmp.keys(), tmp.values())
         plt.title("Sequence length")
         plt.xlabel("s")
         plt.ylabel("mean_rmse")
         plt.show()
 
     def plot_fh(self):
-        plt.scatter(self.fh_plot_x, self.fh_plot_y)
+        tmp = {self.fh_plot_x[i] : self.fh_plot_y[i] for i in range(len(self.fh_plot_x))}
+        tmp = dict(sorted(tmp.items()))
+        plt.plot(tmp.keys(), tmp.values())
         plt.title("Forcasting horizon")
         plt.xlabel("fh")
         plt.ylabel("mean_rmse")

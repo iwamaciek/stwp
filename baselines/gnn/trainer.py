@@ -73,7 +73,7 @@ class Trainer:
         # )
 
         # Callbacks
-        self.lr_callback = LRAdjustCallback(self.optimizer)
+        self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
         self.early_stop_callback = EarlyStoppingCallback()
 

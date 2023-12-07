@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import time
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from torch.optim.lr_scheduler import StepLR
 from baselines.gnn.processor import NNDataProcessor
 from baselines.config import DEVICE, FH, BATCH_SIZE
 from baselines.gnn.callbacks import (
@@ -25,7 +24,7 @@ class Trainer:
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
         # If subset param is given train_data and test_data will have len=subset
-        self.nn_proc = NNDataProcessor(spatial_encoding=True)
+        self.nn_proc = NNDataProcessor(spatial_encoding=False)
         self.nn_proc.preprocess(subset=subset)
         self.train_loader = self.nn_proc.train_loader
         self.test_loader = self.nn_proc.test_loader
@@ -72,10 +71,9 @@ class Trainer:
         # self.optimizer = torch.optim.AdamW(
         #     self.model.parameters(), betas=(0.9, 0.95), weight_decay=0.1, lr=self.lr
         # )
-        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=self.gamma)
 
         # Callbacks
-        self.lr_callback = LRAdjustCallback(self.optimizer, self.scheduler)
+        self.lr_callback = LRAdjustCallback(self.optimizer)
         self.ckpt_callback = CkptCallback(self.model)
         self.early_stop_callback = EarlyStoppingCallback()
 

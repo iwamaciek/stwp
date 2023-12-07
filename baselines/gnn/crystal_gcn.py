@@ -16,6 +16,7 @@ class CrystalGNN(torch.nn.Module):
             # [NNConv(hidden_dim, hidden_dim, nn=torch.nn.Linear(3, 3)) for _ in range(N)]
         )
         self.mlp_decoder = nn.Linear(hidden_dim, output_features * FH)
+        self.layer_norm_decoder = nn.LayerNorm(output_features * FH)
 
     def forward(self, x, edge_index, edge_attr):
         x = x.view(-1, x.size(-2) * x.size(-1))

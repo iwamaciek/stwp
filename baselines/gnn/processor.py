@@ -11,13 +11,7 @@ from sklearn.preprocessing import (
     MaxAbsScaler,
 )
 from sklearn.utils import shuffle
-from baselines.config import (
-    DEVICE,
-    FH,
-    INPUT_SIZE,
-    TRAIN_RATIO,
-    BATCH_SIZE,
-)
+from baselines.config import DEVICE, FH, INPUT_SIZE, TRAIN_RATIO, BATCH_SIZE, R
 
 sys.path.append("..")
 from baselines.data_processor import DataProcessor
@@ -139,108 +133,35 @@ class NNDataProcessor:
 
         return X, y
 
-    def create_edges(self):
+    def create_edges(self, r=R):
         def node_index(i, j, num_cols):
             return i * num_cols + j
 
         # edge aggregation unit
         u = 0.5
         edge_index = []
-        edge_weights = []
         edge_attr = []
-        for i in range(self.num_latitudes):
-            for j in range(self.num_longitudes):
+        _, indices = DataProcessor.count_neighbours(radius=r)
 
-                # Up
-                if i > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i - 1, j, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([u, 0, u])
-
-                # Left
-                if j > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i, j - 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([0, -u, u])
-
-                # Down
-                if i < self.num_latitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i + 1, j, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([-u, 0, u])
-
-                # Right
-                if j < self.num_longitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i, j + 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([0, u, u])
-
-                # Up-Left
-                if i > 0 and j > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i - 1, j - 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([u, -u, np.sqrt(2 * u)])
-
-                # Up-Right
-                if i > 0 and j < self.num_longitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i - 1, j + 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([u, u, np.sqrt(2 * u)])
-
-                # Down-Left
-                if i < self.num_latitudes - 1 and j > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i + 1, j - 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([-u, -u, np.sqrt(2 * u)])
-
-                # Down-Right
-                if i < self.num_latitudes - 1 and j < self.num_longitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i + 1, j + 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([-u, u, np.sqrt(2 * u)])
+        for la in range(self.num_latitudes):
+            for lo in range(self.num_longitudes):
+                for (i, j) in indices:
+                    if (
+                        -1 < la + i < self.num_latitudes
+                        and -1 < lo + j < self.num_longitudes
+                    ):
+                        edge_index.append(
+                            [
+                                node_index(la, lo, self.num_longitudes),
+                                node_index(la + i, lo + j, self.num_longitudes),
+                            ]
+                        )
+                        edge_attr.append(
+                            [u * i, u * j, np.sqrt((u * i) ** 2 + (u * j) ** 2)]
+                        )
 
         edge_index = torch.tensor(edge_index, dtype=torch.int64).t().to(DEVICE)
-        edge_weights = torch.tensor(edge_weights, dtype=torch.float32).to(DEVICE)
+        edge_weights = None
         edge_attr = torch.tensor(edge_attr, dtype=torch.float32).to(DEVICE)  # (e, 2)
 
         return edge_index, edge_weights, edge_attr

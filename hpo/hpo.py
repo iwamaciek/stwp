@@ -83,7 +83,7 @@ class HPO:
 
             processor = DataProcessor(self.data)
             X, y = processor.preprocess(s, self.fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
 
             if self.baseline_type == "simple-linear":
                 linearreg = SimpleLinearRegressor(
@@ -137,7 +137,7 @@ class HPO:
             for s in range(1, max_sequence_lenght + 1):
                 processor = DataProcessor(self.data)
                 X, y = processor.preprocess(s, self.fh, self.use_neighbours)
-                X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+                X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
                 if self.baseline_type == "simple-linear":
                     linearreg = SimpleLinearRegressor(
                         X.shape,
@@ -189,7 +189,7 @@ class HPO:
         try:
             processor = DataProcessor(self.data)
             X, y = processor.preprocess(self.best_s, self.fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
 
             if self.baseline_type == "simple-linear":
                 alpha = trial.suggest_float("alpha", 0.1, self.max_alpha, log=True)
@@ -259,7 +259,7 @@ class HPO:
 
             processor = DataProcessor(self.data)
             X, y = processor.preprocess(self.best_s, fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
 
             if self.baseline_type == "simple-linear":
                 linearreg = SimpleLinearRegressor(

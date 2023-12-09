@@ -34,9 +34,11 @@ class NNDataProcessor:
         self.num_features = self.num_features - self.num_spatial_constants
 
         self.train_loader = None
+        self.val_loader = None
         self.test_loader = None
 
         self.train_size = None
+        self.val_size = None
         self.test_size = None
         self.scaler = None
         self.scalers = None
@@ -46,17 +48,20 @@ class NNDataProcessor:
 
     def preprocess(self, subset=None):
         self.edge_index, self.edge_weights, self.edge_attr = self.create_edges()
-        X_train, X_test, y_train, y_test = self.train_test_split()
+        X_train, X_test, y_train, y_test = self.train_val_test_split()
         X, y = self.fit_transform_scalers(X_train, X_test, y_train, y_test)
-        self.train_loader, self.test_loader = self.get_loaders(X, y, subset)
+        self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
+            X, y, subset
+        )
 
-    def train_test_split(self):
+    def train_val_test_split(self):
         processor = DataProcessor(spatial_encoding=self.spatial_encoding)
         X, y = processor.preprocess(INPUT_SIZE, FH)
 
         self.num_samples = X.shape[0]
         self.train_size = int(self.num_samples * TRAIN_RATIO)
-        self.test_size = self.num_samples - self.train_size
+        self.val_size = self.train_size
+        self.test_size = self.num_samples - self.train_size - self.val_size
 
         X = X.reshape(
             -1,
@@ -67,13 +72,11 @@ class NNDataProcessor:
             -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
         )
 
-        return DataProcessor.train_test_split(X, y)
+        return DataProcessor.train_val_test_split(X, y, split_type=3)
 
     def fit_transform_scalers(
         self, X_train, X_test, y_train, y_test, scaler_type="standard"
     ):
-        self.train_size = len(X_train)
-        self.test_size = len(X_test)
 
         if scaler_type == "min_max":
             self.scaler = MinMaxScaler()
@@ -105,7 +108,9 @@ class NNDataProcessor:
                 .reshape((self.train_size, Xi_shape))
             )
             X_test[..., i] = (
-                self.scalers[i].transform(X_test_i).reshape((self.test_size, Xi_shape))
+                self.scalers[i]
+                .transform(X_test_i)
+                .reshape((self.test_size + self.val_size, Xi_shape))
             )
             y_train[..., i] = (
                 self.scalers[i]
@@ -113,7 +118,9 @@ class NNDataProcessor:
                 .reshape((self.train_size, yi_shape))
             )
             y_test[..., i] = (
-                self.scalers[i].transform(y_test_i).reshape((self.test_size, yi_shape))
+                self.scalers[i]
+                .transform(y_test_i)
+                .reshape((self.test_size + self.val_size, yi_shape))
             )
 
         X = np.concatenate((X_train, X_test), axis=0)
@@ -178,13 +185,16 @@ class NNDataProcessor:
             dataset.append(g)
 
         train_dataset = dataset[: self.train_size]
+        val_dataset = dataset[self.train_size : self.train_size + self.val_size]
         test_dataset = dataset[-self.test_size :]
         # random state for reproduction
         train_dataset = shuffle(train_dataset, random_state=42)
+        val_dataset = shuffle(val_dataset, random_state=42)
         test_dataset = shuffle(test_dataset, random_state=42)
 
         if subset is not None:
             train_dataset = train_dataset[: subset * BATCH_SIZE]
+            val_dataset = val_dataset[: subset * BATCH_SIZE]
             test_dataset = test_dataset[: subset * BATCH_SIZE]
 
         # if subset is None:
@@ -194,8 +204,9 @@ class NNDataProcessor:
         #     test_sampler = RandomSampler(test_dataset, num_samples=subset)
 
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
+        val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
         test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
-        return train_loader, test_loader
+        return train_loader, val_loader, test_loader
 
     def get_shapes(self):
         return (

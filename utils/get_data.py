@@ -17,7 +17,7 @@ c.retrieve(
             "total_cloud_cover",
             "total_precipitation",
         ],
-        "year": ["2021", "2022"],
+        "year": ["2020", "2021", "2022"],
         "month": [
             "01",
             "02",
@@ -71,14 +71,18 @@ c.retrieve(
             "12:00",
             "18:00",
         ],
-        "area": [
+        "area": [  # for neural nets
             55.75,
             13.25,
             48,
             25,
         ],
+        # 'area': [ # for baselines
+        #     55, 14, 49,
+        #     25,
+        # ],
     },
-    "../data2021-2022.grib",
+    "../data2021-2023.grib",
 )
 
-# ~ 14min
+# ~ 24min

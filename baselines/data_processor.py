@@ -121,9 +121,39 @@ class DataProcessor:
         return data, feature_list
 
     @staticmethod
-    def train_test_split(X, y, train_split=TRAIN_RATIO):
-        train_samples = int(train_split * len(X))
+    def train_val_test_split(X, y, split_ratio=TRAIN_RATIO, split_type=1):
+        """
+        split_type=0: X_train (2020), X_val (2021), X_test (2022)
+        split_type=1: X_train (2020), X_test (2021)
+        split_type=2: X_train (2020), X_test (2022)
+        split_type=3: X_train (2020), X_test (2021-2022)
+        """
         # randomness might influence the score !!!
+        train_samples = int(split_ratio * len(X))
+
+        if split_type == 0:
+            X_train, X_val, X_test = (
+                X[:train_samples],
+                X[train_samples : 2 * train_samples],
+                X[2 * train_samples :],
+            )
+            y_train, y_val, y_test = (
+                y[:train_samples],
+                y[train_samples : 2 * train_samples],
+                y[2 * train_samples :],
+            )
+            return X_train, X_val, X_test, y_train, y_val, y_test
+
+        elif split_type == 1:
+            X_train, X_test = X[:train_samples], X[train_samples : 2 * train_samples]
+            y_train, y_test = y[:train_samples], y[train_samples : 2 * train_samples]
+            return X_train, X_test, y_train, y_test
+
+        elif split_type == 2:
+            X_train, X_test = X[:train_samples], X[2 * train_samples :]
+            y_train, y_test = y[:train_samples], y[2 * train_samples :]
+            return X_train, X_test, y_train, y_test
+
         X_train, X_test = X[:train_samples], X[train_samples:]
         y_train, y_test = y[:train_samples], y[train_samples:]
         return X_train, X_test, y_train, y_test

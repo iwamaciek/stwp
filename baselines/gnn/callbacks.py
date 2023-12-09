@@ -3,7 +3,7 @@ import torch
 
 
 class LRAdjustCallback:
-    def __init__(self, optimizer, patience=10, epsilon=5e-4, gamma=0.5):
+    def __init__(self, optimizer, patience=7, epsilon=5e-4, gamma=0.5):
         self.optimizer = optimizer
         self.patience = patience
         self.epsilon = epsilon

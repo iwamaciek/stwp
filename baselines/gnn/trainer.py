@@ -27,6 +27,7 @@ class Trainer:
         self.nn_proc = NNDataProcessor(spatial_encoding=False)
         self.nn_proc.preprocess(subset=subset)
         self.train_loader = self.nn_proc.train_loader
+        self.val_loader = self.nn_proc.val_loader
         self.test_loader = self.nn_proc.test_loader
         self.feature_list = self.nn_proc.feature_list
         self.features = len(self.feature_list)
@@ -37,6 +38,7 @@ class Trainer:
         self.edge_attr = self.nn_proc.edge_attr
         self.scalers = self.nn_proc.scalers
         self.train_size = len(self.train_loader)
+        self.val_size = len(self.val_loader)
         self.test_size = len(self.test_loader)
         if subset is None:
             self.subset = self.train_size
@@ -114,12 +116,12 @@ class Trainer:
             self.model.eval()
             with torch.no_grad():
                 val_loss = 0
-                for batch in self.test_loader:
+                for batch in self.val_loader:
                     y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
                     loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
                     val_loss += loss.item()
 
-            avg_val_loss = val_loss / min(self.subset, self.test_size)
+            avg_val_loss = val_loss / min(self.subset, self.val_size)
             val_loss_list.append(avg_val_loss)
 
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")
@@ -171,8 +173,10 @@ class Trainer:
             sample = next(iter(self.train_loader))
         elif data_type == "test":
             sample = next(iter(self.test_loader))
+        elif data_type == "val":
+            sample = next(iter(self.val_loader))
         else:
-            print("Invalid type: (train, test)")
+            print("Invalid type: (train, test, val)")
             raise ValueError
 
         X, y = sample.x, sample.y
@@ -215,8 +219,10 @@ class Trainer:
             loader = self.train_loader
         elif data_type == "test":
             loader = self.test_loader
+        elif data_type == "val":
+            loader = self.val_loader
         else:
-            print("Invalid type: (train, test)")
+            print("Invalid type: (train, test, val)")
             raise ValueError
 
         y = np.empty((0, self.latitude, self.longitude, self.features, FH))

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 import cfgrib
 import numpy as np
+import pygrib
+
 from baselines.config import DATA_PATH, TRAIN_RATIO, INPUT_SIZE, FH, R
+from utils.get_data import query_dict
 
 
 class DataProcessor:
@@ -121,6 +124,10 @@ class DataProcessor:
         return data, feature_list
 
     @staticmethod
+    def train_test_split(X, y, split_ratio=TRAIN_RATIO):
+        return DataProcessor.train_val_test_split(X, y, split_ratio)
+
+    @staticmethod
     def train_val_test_split(X, y, split_ratio=TRAIN_RATIO, split_type=1):
         """
         split_type=0: X_train (2020), X_val (2021), X_test (2022)
@@ -173,3 +180,13 @@ class DataProcessor:
                     count += 1
                     indices.append((x, y))
         return count, indices
+
+    @staticmethod
+    def get_spatial_info():
+        grbs = pygrib.open(DATA_PATH)
+        grbs.seek(0)
+        grb = grbs[1]
+        l = query_dict["area"]
+        spatial_limits = [l[1], l[3], l[2], l[0]]
+        lat_span, lon_span = grb.latlons()
+        return lat_span, lon_span, spatial_limits

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 import copy
+import cartopy.crs as ccrs
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.dummy import DummyRegressor
@@ -11,6 +12,7 @@ from sklearn.preprocessing import (
     MaxAbsScaler,
     RobustScaler,
 )
+from utils.draw_functions import draw_poland
 
 
 class BaselineRegressor:
@@ -97,14 +99,29 @@ class BaselineRegressor:
     def evaluate(self, y_hat, y_test):
         return self.get_rmse(y_hat, y_test)
 
-    def plot_predictions(self, y_hat, y_test, max_samples):
+    def plot_predictions(self, y_hat, y_test, max_samples, pretty=False):
+        if pretty:
+            lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
+            spatial = {
+                "lat_span": lat_span,
+                "lon_span": lon_span,
+                "spatial_limits": spatial_limits,
+            }
         for i in range(max_samples):
             y_test_sample, y_hat_sample = y_test[i], y_hat[i]
-            fig, ax = plt.subplots(
-                self.num_features,
-                3 * self.fh,
-                figsize=(10 * self.fh, 3 * self.num_features),
-            )
+            if pretty:
+                fig, axs = plt.subplots(
+                    self.num_features,
+                    3 * self.fh,
+                    figsize=(10 * self.fh, 3 * self.num_features),
+                    subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
+                )
+            else:
+                fig, ax = plt.subplots(
+                    self.num_features,
+                    3 * self.fh,
+                    figsize=(10 * self.fh, 3 * self.num_features),
+                )
 
             for j in range(self.num_features):
                 cur_feature = self.feature_list[j]
@@ -123,6 +140,8 @@ class BaselineRegressor:
 
                 for k in range(3 * self.fh):
                     ts = k // 3
+                    if pretty:
+                        ax = axs[j, k]
                     if k % 3 == 0:
                         title = rf"$X_{{{cur_feature},t+{ts+1}}}$"
                         value = y_test[i, ..., ts, j]
@@ -135,10 +154,14 @@ class BaselineRegressor:
                         title = rf"$|X - \hat{{X}}|_{{{cur_feature},t+{ts+1}}}$"
                         value = np.abs(y_test[i, ..., ts, j] - y_hat[i, ..., ts, j])
                         cmap = "binary"
-                    pl = ax[j, k].imshow(value, cmap=cmap)
-                    ax[j, k].set_title(title)
-                    ax[j, k].axis("off")
-                    _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+
+                    if pretty:
+                        draw_poland(ax, value, title, cmap, **spatial)
+                    else:
+                        pl = ax[j, k].imshow(value, cmap=cmap)
+                        ax[j, k].set_title(title)
+                        ax[j, k].axis("off")
+                        _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
             plt.show()
 
     def predict_(self, X_test, y_test):

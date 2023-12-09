@@ -4,7 +4,7 @@ venv
 *.mp4
 *.grib
 test.txt
-__pycache__
+__pycache__/
 .idea
 emc.py
 *.pt

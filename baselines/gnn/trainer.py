@@ -19,7 +19,13 @@ from baselines.gnn.basic_gcn import BasicGCN
 
 class Trainer:
     def __init__(
-        self, architecture="cgcn", hidden_dim=64, lr=0.01, gamma=0.5, subset=None
+        self,
+        architecture="cgcn",
+        hidden_dim=64,
+        lr=0.01,
+        gamma=0.5,
+        subset=None,
+        spatial_mapping=True,
     ):
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
@@ -40,6 +46,7 @@ class Trainer:
         self.train_size = len(self.train_loader)
         self.val_size = len(self.val_loader)
         self.test_size = len(self.test_loader)
+        self.spatial_mapping = spatial_mapping
         if subset is None:
             self.subset = self.train_size
         else:
@@ -94,8 +101,13 @@ class Trainer:
             total_loss = 0
             for batch in self.train_loader:
                 y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
+                batch_y = batch.y
 
-                loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
+                if self.spatial_mapping:
+                    y_hat = self.nn_proc.map_latitude_longitude_span(y_hat)
+                    batch_y = self.nn_proc.map_latitude_longitude_span(batch.y)
+
+                loss = self.criterion(y_hat, batch_y) / BATCH_SIZE
                 loss.backward()
 
                 # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
@@ -118,7 +130,13 @@ class Trainer:
                 val_loss = 0
                 for batch in self.val_loader:
                     y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
-                    loss = self.criterion(y_hat, batch.y) / BATCH_SIZE
+                    batch_y = batch.y
+
+                    if self.spatial_mapping:
+                        y_hat = self.nn_proc.map_latitude_longitude_span(y_hat)
+                        batch_y = self.nn_proc.map_latitude_longitude_span(batch.y)
+
+                    loss = self.criterion(y_hat, batch_y) / BATCH_SIZE
                     val_loss += loss.item()
 
             avg_val_loss = val_loss / min(self.subset, self.val_size)
@@ -183,6 +201,11 @@ class Trainer:
         y, y_hat = self.inverse_normalization_predict(
             X, y, sample.edge_index, sample.edge_attr
         )
+        latitude, longitude = self.latitude, self.longitude
+        if self.spatial_mapping:
+            y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
+            y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
+            latitude, longitude = y_hat.shape[1:3]
 
         for i in range(BATCH_SIZE):
             fig, ax = plt.subplots(
@@ -205,9 +228,7 @@ class Trainer:
                         value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
                         cmap = "binary"
 
-                    pl = ax[j, k].imshow(
-                        value.reshape(self.latitude, self.longitude), cmap=cmap
-                    )
+                    pl = ax[j, k].imshow(value.reshape(latitude, longitude), cmap=cmap)
                     ax[j, k].set_title(title)
                     ax[j, k].axis("off")
                     _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
@@ -234,6 +255,9 @@ class Trainer:
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
+        if self.spatial_mapping:
+            y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
+            y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
         self.calculate_matrics(y_hat, y)
 
     def calculate_matrics(self, y_hat, y):

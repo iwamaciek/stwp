@@ -215,3 +215,39 @@ class NNDataProcessor:
             self.num_longitudes,
             self.num_features + self.num_spatial_constants,
         )
+
+    def map_latitude_longitude_span(
+        self, input_tensor, old_span=(32, 48), new_span=(25, 45), flat=True
+    ):
+        """
+        Maps latitude-longitude span e.g. (32,48) -> (25,45)
+        """
+        if flat:
+            batch_size = int(
+                input_tensor.shape[0] / self.num_latitudes / self.num_longitudes
+            )
+            input_tensor = input_tensor.reshape(
+                (
+                    batch_size,
+                    self.num_latitudes,
+                    self.num_longitudes,
+                    self.num_features,
+                    1,
+                )
+            )
+
+        old_lat, old_lon = old_span
+        new_lat, new_lon = new_span
+
+        lat_diff = old_lat - new_lat
+        left_lat = lat_diff // 2
+        right_lat = new_lat + lat_diff - left_lat - 1
+
+        lon_diff = old_lon - new_lon
+        up_lon = lon_diff // 2
+        down_lon = new_lon + lon_diff - up_lon - 1
+
+        mapped_tensor = input_tensor[:, left_lat:right_lat, up_lon:down_lon]
+        mapped_tensor.reshape(-1, self.num_features, mapped_tensor.shape[4])
+
+        return mapped_tensor

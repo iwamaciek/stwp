@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 import cfgrib
 import numpy as np
+from datetime import datetime
+from utils.datetime_operations import datetime64_to_datetime, get_day_of_year
+from utils.trig_encode import trig_encode
 
 from baselines.config import DATA_PATH, TRAIN_RATIO, INPUT_SIZE, FH, R
 from utils.get_data import BIG_AREA, SMALL_AREA
 
 
 class DataProcessor:
-    def __init__(self, spatial_encoding=False):
-        self.data, self.feature_list = self.load_data(spatial_encoding=spatial_encoding)
+    def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False):
+        self.data, self.feature_list = self.load_data(spatial_encoding=(spatial_encoding or additional_encodings), temporal_encoding=(temporal_encoding or additional_encodings))
         self.samples, self.latitude, self.longitude, self.num_features = self.data.shape
         self.num_spatial_constants = self.num_features - len(self.feature_list)
         self.num_features = self.num_features - self.num_spatial_constants
@@ -71,7 +74,7 @@ class DataProcessor:
         return X, y
 
     @staticmethod
-    def load_data(path=DATA_PATH, spatial_encoding=False):
+    def load_data(path=DATA_PATH, spatial_encoding=False, temporal_encoding=False):
         grib_data = cfgrib.open_datasets(path)
         surface = grib_data[0]
         hybrid = grib_data[1]
@@ -92,16 +95,6 @@ class DataProcessor:
             z = surface.z.to_numpy()
             data = np.concatenate((data, np.stack((lsm, z), axis=-1)), axis=-1)
 
-            def spatial_encode(v, norm_v, trig_func="sin"):
-                if trig_func == "sin":
-                    v_encoded = np.sin(2 * np.pi * v / norm_v)
-                elif trig_func == "cos":
-                    v_encoded = np.cos(2 * np.pi * v / norm_v)
-                else:
-                    print("Function not implemented")
-                    return None
-                return v_encoded
-
             spatial_encodings = np.empty(data.shape[:-1] + (4,))
 
             latitudes = np.array(surface.latitude)
@@ -110,15 +103,37 @@ class DataProcessor:
                 for j, lon in enumerate(longitudes):
                     for idx, v in enumerate(
                         [
-                            spatial_encode(lat, 180, "sin"),
-                            spatial_encode(lat, 180, "cos"),
-                            spatial_encode(lon, 360, "sin"),
-                            spatial_encode(lon, 360, "cos"),
+                            trig_encode(lat, 180, "sin"),
+                            trig_encode(lat, 180, "cos"),
+                            trig_encode(lon, 360, "sin"),
+                            trig_encode(lon, 360, "cos"),
                         ]
                     ):
                         spatial_encodings[:, i, j, idx] = np.repeat(v, data.shape[0])
 
             data = np.concatenate((data, spatial_encodings), axis=-1)
+        
+        if temporal_encoding:
+
+            dt = surface.time.to_numpy()
+            dt = np.fromiter((datetime64_to_datetime(ti) for ti in dt), dtype=datetime)
+            
+            temporal_encodings = np.empty(data.shape[:-1] + (4,))
+
+            for t in range(data.shape[0]):
+                for i in range(data.shape[1]):
+                    for j in range(data.shape[2]):
+                        for idx, v in enumerate(
+                            [
+                                trig_encode(get_day_of_year(dt[t]), 365, "sin"),
+                                trig_encode(get_day_of_year(dt[t]), 365, "cos"),
+                                trig_encode(dt[t].hour, 24, "sin"),
+                                trig_encode(dt[t].hour, 24, "cos"),
+                            ]
+                        ):
+                            temporal_encodings[t, i, j, idx] = v
+            
+            data = np.concatenate((data, temporal_encodings), axis=-1)
 
         return data, feature_list
 

@@ -19,9 +19,9 @@ from baselines.data_processor import DataProcessor
 
 class NNDataProcessor:
     def __init__(self, spatial_encoding=False):
-        self.dataset, self.feature_list = DataProcessor.load_data(
-            spatial_encoding=spatial_encoding
-        )
+        self.data_proc = DataProcessor(spatial_encoding=spatial_encoding)
+        self.dataset = self.data_proc.data
+        self.feature_list = self.data_proc.feature_list
         (
             self.num_samples,
             self.num_latitudes,
@@ -55,8 +55,7 @@ class NNDataProcessor:
         )
 
     def train_val_test_split(self):
-        processor = DataProcessor(spatial_encoding=self.spatial_encoding)
-        X, y = processor.preprocess(INPUT_SIZE, FH)
+        X, y = self.data_proc.preprocess(INPUT_SIZE, FH)
 
         self.num_samples = X.shape[0]
         self.train_size = int(self.num_samples * TRAIN_RATIO)
@@ -72,7 +71,7 @@ class NNDataProcessor:
             -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
         )
 
-        return DataProcessor.train_val_test_split(X, y, split_type=3)
+        return self.data_proc.train_val_test_split(X, y, split_type=3)
 
     def fit_transform_scalers(
         self, X_train, X_test, y_train, y_test, scaler_type="standard"

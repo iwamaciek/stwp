@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import cfgrib
 import numpy as np
-import pygrib
 
 from baselines.config import DATA_PATH, TRAIN_RATIO, INPUT_SIZE, FH, R
-from utils.get_data import query_dict
+from utils.get_data import BIG_AREA, SMALL_AREA
 
 
 class DataProcessor:
@@ -183,10 +182,11 @@ class DataProcessor:
 
     @staticmethod
     def get_spatial_info():
-        grbs = pygrib.open(DATA_PATH)
-        grbs.seek(0)
-        grb = grbs[1]
-        l = query_dict["area"]
-        spatial_limits = [l[1], l[3], l[2], l[0]]
-        lat_span, lon_span = grb.latlons()
+        res = 0.25
+        north, west, south, east = SMALL_AREA
+        spatial_limits = [west, east, south, north]
+        we_span_1d = np.arange(west, east + res, res)
+        ns_span_1d = np.arange(north, south - res, -res)
+        lon_span = np.array([we_span_1d for _ in range(len(ns_span_1d))])
+        lat_span = np.array([ns_span_1d for _ in range(len(we_span_1d))]).T
         return lat_span, lon_span, spatial_limits

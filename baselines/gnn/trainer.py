@@ -1,11 +1,12 @@
 import numpy as np
 import torch
-import torch.nn as nn
 import matplotlib.pyplot as plt
 import time
+import cartopy.crs as ccrs
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from baselines.gnn.processor import NNDataProcessor
+from baselines.data_processor import DataProcessor
 from baselines.config import DEVICE, FH, BATCH_SIZE
 from baselines.gnn.callbacks import (
     LRAdjustCallback,
@@ -187,7 +188,7 @@ class Trainer:
 
         return y, y_hat
 
-    def plot_predictions(self, data_type="test"):
+    def plot_predictions(self, data_type="test", pretty=False):
         if data_type == "train":
             sample = next(iter(self.train_loader))
         elif data_type == "test":
@@ -198,24 +199,43 @@ class Trainer:
             print("Invalid type: (train, test, val)")
             raise ValueError
 
+        if pretty:
+            lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
+            spatial = {
+                "lat_span": lat_span,
+                "lon_span": lon_span,
+                "spatial_limits": spatial_limits,
+            }
+
         X, y = sample.x, sample.y
         y, y_hat = self.inverse_normalization_predict(
             X, y, sample.edge_index, sample.edge_attr
         )
         latitude, longitude = self.latitude, self.longitude
+
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
             latitude, longitude = y_hat.shape[1:3]
 
         for i in range(BATCH_SIZE):
-            fig, ax = plt.subplots(
-                self.features, 3 * FH, figsize=(10 * FH, 3 * self.features)
-            )
+            if pretty:
+                fig, axs = plt.subplots(
+                    self.features,
+                    3 * FH,
+                    figsize=(10 * FH, 3 * self.features),
+                    subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
+                )
+            else:
+                fig, ax = plt.subplots(
+                    self.features, 3 * FH, figsize=(10 * FH, 3 * self.features)
+                )
 
             for j, feature_name in enumerate(self.feature_list):
                 for k in range(3 * FH):
                     ts = k // 3
+                    if pretty:
+                        ax = axs[j, k]
                     if k % 3 == 0:
                         title = rf"$X_{{{feature_name},t+{ts + 1}}}$"
                         value = y[i, ..., j, ts]
@@ -229,10 +249,15 @@ class Trainer:
                         value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
                         cmap = "binary"
 
-                    pl = ax[j, k].imshow(value.reshape(latitude, longitude), cmap=cmap)
-                    ax[j, k].set_title(title)
-                    ax[j, k].axis("off")
-                    _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+                    if pretty:
+                        draw_poland(ax, value, title, cmap, **spatial)
+                    else:
+                        pl = ax[j, k].imshow(
+                            value.reshape(latitude, longitude), cmap=cmap
+                        )
+                        ax[j, k].set_title(title)
+                        ax[j, k].axis("off")
+                        _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
         self.calculate_matrics(y_hat, y)
 

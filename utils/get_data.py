@@ -5,6 +5,9 @@ c = cdsapi.Client()
 dataset = "reanalysis-era5-single-levels"
 path = "../data2021-2023.grib"
 
+BIG_AREA = [55.75, 13.25, 48, 25]  # for nn
+SMALL_AREA = [55, 14, 49, 25]
+
 query_dict = {
     "product_type": "reanalysis",
     "format": "grib",
@@ -72,16 +75,7 @@ query_dict = {
         "12:00",
         "18:00",
     ],
-    "area": [  # for neural nets
-        55.75,
-        13.25,
-        48,
-        25,
-    ],
-    # 'area': [ # for baselines
-    #     55, 14, 49,
-    #     25,
-    # ],
+    "area": BIG_AREA,
 }
 
 

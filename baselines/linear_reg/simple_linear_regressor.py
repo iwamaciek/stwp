@@ -72,7 +72,6 @@ class SimpleLinearRegressor(BaselineRegressor):
                     .reshape(1, self.latitude, self.longitude)
                 )
                 for k in range(self.fh - 1):
-                    # print("Xij before conc", Xij.shape)
                     if self.fh - self.input_state < 2:
                         autoreg_start = 0
                     else:
@@ -94,10 +93,7 @@ class SimpleLinearRegressor(BaselineRegressor):
                             ),
                             axis=2,
                         )
-                    # print("Xij after conc", Xij.shape)
                     Xij = Xij.reshape(-1, self.neighbours * self.input_state)
-                    # print("Xij before predict", Xij.shape)
-                    # print("We need:",  y_hat_ij[..., k + 1].shape)
                     y_hat_ij[..., k + 1] = (
                         self.models[j]
                         .predict(Xij)

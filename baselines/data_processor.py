@@ -10,9 +10,17 @@ from utils.get_data import BIG_AREA, SMALL_AREA
 
 
 class DataProcessor:
-    def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False):
+    def __init__(
+        self,
+        spatial_encoding=False,
+        temporal_encoding=False,
+        additional_encodings=False,
+    ):
         self.num_spatial_constants, self.num_temporal_constants = 0, 0
-        self.data, self.feature_list = self.load_data(spatial_encoding=(spatial_encoding or additional_encodings), temporal_encoding=(temporal_encoding or additional_encodings))
+        self.data, self.feature_list = self.load_data(
+            spatial_encoding=(spatial_encoding or additional_encodings),
+            temporal_encoding=(temporal_encoding or additional_encodings),
+        )
         self.samples, self.latitude, self.longitude, self.num_features = self.data.shape
         self.num_features = self.num_features - self.num_spatial_constants - self.num_temporal_constants
         self.neighbours, self.input_size = None, None
@@ -92,6 +100,7 @@ class DataProcessor:
 
             lsm = surface.lsm.to_numpy()
             z = surface.z.to_numpy()
+            z = (z - z.mean()) / z.std()
             data = np.concatenate((data, np.stack((lsm, z), axis=-1)), axis=-1)
 
             spatial_encodings = np.empty(data.shape[:-1] + (4,))
@@ -117,7 +126,7 @@ class DataProcessor:
 
             dt = surface.time.to_numpy()
             dt = np.fromiter((datetime64_to_datetime(ti) for ti in dt), dtype=datetime)
-            
+
             temporal_encodings = np.empty(data.shape[:-1] + (4,))
 
             for t in range(data.shape[0]):
@@ -132,7 +141,7 @@ class DataProcessor:
                             ]
                         ):
                             temporal_encodings[t, i, j, idx] = v
-            
+
             data = np.concatenate((data, temporal_encodings), axis=-1)
             self.num_temporal_constants = 4
 

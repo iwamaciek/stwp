@@ -54,7 +54,7 @@ class DataProcessor:
                 self.longitude,
                 self.neighbours + 1,
                 self.input_size,
-                self.num_features + self.num_spatial_constants + self.num_spatial_constants,
+                self.num_features + self.num_spatial_constants + self.num_temporal_constants,
             )
         )
         neigh_data[..., 0, :, :] = self.data
@@ -143,7 +143,8 @@ class DataProcessor:
                             temporal_encodings[t, i, j, idx] = v
 
             data = np.concatenate((data, temporal_encodings), axis=-1)
-            self.num_temporal_constants = 4
+            # self.temporal_data = temporal_encodings
+            self.num_temporal_constants = 4 # temporal_encodings.shape[-1]
 
         return data, feature_list
 

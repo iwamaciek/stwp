@@ -18,8 +18,8 @@ from baselines.data_processor import DataProcessor
 
 
 class NNDataProcessor:
-    def __init__(self, spatial_encoding=False):
-        self.data_proc = DataProcessor(spatial_encoding=spatial_encoding)
+    def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False):
+        self.data_proc = DataProcessor(spatial_encoding=spatial_encoding, temporal_encoding=temporal_encoding, additional_encodings=additional_encodings)
         self.dataset = self.data_proc.data
         self.feature_list = self.data_proc.feature_list
         (
@@ -29,9 +29,11 @@ class NNDataProcessor:
             self.num_features,
         ) = self.dataset.shape
 
-        self.spatial_encoding = spatial_encoding
-        self.num_spatial_constants = self.num_features - len(self.feature_list)
-        self.num_features = self.num_features - self.num_spatial_constants
+        self.spatial_encoding = (spatial_encoding or additional_encodings)
+        self.temporal_encoding = (temporal_encoding or additional_encodings)
+        self.num_spatial_constants = self.data_proc.num_spatial_constants
+        self.num_temporal_constants = self.data_proc.num_temporal_constants
+        self.num_features = self.num_features - self.num_spatial_constants - self.num_temporal_constants
 
         self.train_loader = None
         self.val_loader = None
@@ -65,7 +67,7 @@ class NNDataProcessor:
         X = X.reshape(
             -1,
             self.num_latitudes * self.num_longitudes * INPUT_SIZE,
-            self.num_features + self.num_spatial_constants,
+            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
@@ -129,7 +131,7 @@ class NNDataProcessor:
             -1,
             self.num_latitudes * self.num_longitudes,
             INPUT_SIZE,
-            self.num_features + self.num_spatial_constants,
+            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes, FH, self.num_features
@@ -212,7 +214,7 @@ class NNDataProcessor:
             self.num_samples,
             self.num_latitudes,
             self.num_longitudes,
-            self.num_features + self.num_spatial_constants,
+            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
         )
 
     def map_latitude_longitude_span(

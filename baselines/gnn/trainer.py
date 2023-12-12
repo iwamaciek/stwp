@@ -13,9 +13,7 @@ from baselines.gnn.callbacks import (
     CkptCallback,
     EarlyStoppingCallback,
 )
-from baselines.gnn.temporal_gnn import TemporalGNN
 from baselines.gnn.crystal_gcn import CrystalGNN
-from baselines.gnn.basic_gcn import BasicGCN
 from utils.draw_functions import draw_poland
 
 
@@ -55,20 +53,12 @@ class Trainer:
             self.subset = subset
 
         # Architecture details
-        if architecture == "a3tgcn":
-            self.model = TemporalGNN(
-                self.features + self.constants, self.features, hidden_dim
-            ).to(DEVICE)
-        elif architecture == "cgcn":
+        if architecture == "cgcn":
             self.model = CrystalGNN(
                 self.features + self.constants,
                 self.features,
                 self.edge_attr.size(-1),
                 hidden_dim,
-            ).to(DEVICE)
-        elif architecture == "gcn":
-            self.model = BasicGCN(
-                self.features + self.constants, self.features, hidden_dim
             ).to(DEVICE)
         else:
             # TODO handling

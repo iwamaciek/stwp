@@ -4,8 +4,8 @@ import numpy as np
 from datetime import datetime
 from utils.datetime_operations import datetime64_to_datetime, get_day_of_year
 from utils.trig_encode import trig_encode
-
-from baselines.config import DATA_PATH, TRAIN_RATIO, INPUT_SIZE, FH, R
+from sklearn.utils import shuffle
+from baselines.config import DATA_PATH, TRAIN_RATIO, INPUT_SIZE, FH, R, RANDOM_STATE
 from utils.get_data import BIG_AREA, SMALL_AREA
 
 
@@ -174,20 +174,27 @@ class DataProcessor:
                 y[train_samples : 2 * train_samples],
                 y[2 * train_samples :],
             )
+            X_train, y_train = shuffle(X_train, y_train, random_state=RANDOM_STATE)
+            X_val, y_val = shuffle(X_val, y_val, random_state=RANDOM_STATE)
+            X_test, y_test = shuffle(X_test, y_test, random_state=RANDOM_STATE)
+
             return X_train, X_val, X_test, y_train, y_val, y_test
 
         elif split_type == 1:
             X_train, X_test = X[:train_samples], X[train_samples : 2 * train_samples]
             y_train, y_test = y[:train_samples], y[train_samples : 2 * train_samples]
-            return X_train, X_test, y_train, y_test
 
         elif split_type == 2:
             X_train, X_test = X[:train_samples], X[2 * train_samples :]
             y_train, y_test = y[:train_samples], y[2 * train_samples :]
-            return X_train, X_test, y_train, y_test
 
-        X_train, X_test = X[:train_samples], X[train_samples:]
-        y_train, y_test = y[:train_samples], y[train_samples:]
+        else:
+            X_train, X_test = X[:train_samples], X[train_samples:]
+            y_train, y_test = y[:train_samples], y[train_samples:]
+
+        X_train, y_train = shuffle(X_train, y_train, random_state=RANDOM_STATE)
+        X_test, y_test = shuffle(X_test, y_test, random_state=RANDOM_STATE)
+
         return X_train, X_test, y_train, y_test
 
     @staticmethod

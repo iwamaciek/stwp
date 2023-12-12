@@ -11,7 +11,15 @@ from sklearn.preprocessing import (
     MaxAbsScaler,
 )
 from sklearn.utils import shuffle
-from baselines.config import DEVICE, FH, INPUT_SIZE, TRAIN_RATIO, BATCH_SIZE, R
+from baselines.config import (
+    DEVICE,
+    FH,
+    INPUT_SIZE,
+    TRAIN_RATIO,
+    BATCH_SIZE,
+    R,
+    RANDOM_STATE,
+)
 
 sys.path.append("..")
 from baselines.data_processor import DataProcessor
@@ -187,9 +195,9 @@ class NNDataProcessor:
         val_dataset = dataset[self.train_size : self.train_size + self.val_size]
         test_dataset = dataset[-self.test_size :]
         # random state for reproduction
-        train_dataset = shuffle(train_dataset, random_state=42)
-        val_dataset = shuffle(val_dataset, random_state=42)
-        test_dataset = shuffle(test_dataset, random_state=42)
+        train_dataset = shuffle(train_dataset, random_state=RANDOM_STATE)
+        val_dataset = shuffle(val_dataset, random_state=RANDOM_STATE)
+        test_dataset = shuffle(test_dataset, random_state=RANDOM_STATE)
 
         if subset is not None:
             train_dataset = train_dataset[: subset * BATCH_SIZE]

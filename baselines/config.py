@@ -6,5 +6,5 @@ BATCH_SIZE = 4
 FH = 1
 INPUT_SIZE = 5
 R = 2
-DATA_PATH = "../data2020-2022.grib"
+DATA_PATH = "../data/data2020-2022.grib"
 RANDOM_STATE = 42

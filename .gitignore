@@ -16,3 +16,4 @@ emc.py
 gnn_test
 *.txt
 catboost_info
+data

@@ -13,7 +13,11 @@ from baselines.gnn.callbacks import (
     CkptCallback,
     EarlyStoppingCallback,
 )
-from baselines.gnn.crystal_gcn import CrystalGNN
+from baselines.gnn.cgc_conv import CrystalGNN
+from baselines.gnn.transformer_conv import TransformerGNN
+from baselines.gnn.gat_conv import GATConvNN
+from baselines.gnn.gen_conv import GENConvNN
+from baselines.gnn.pdn_conv import PDNConvNN
 from utils.draw_functions import draw_poland
 
 
@@ -53,16 +57,32 @@ class Trainer:
             self.subset = subset
 
         # Architecture details
+        init_dict = {
+            "input_features": self.features + self.constants,
+            "output_features": self.features,
+            "edge_dim": self.edge_attr.size(-1),
+            "hidden_dim": hidden_dim,
+        }
+
         if architecture == "cgcn":
-            self.model = CrystalGNN(
-                self.features + self.constants,
-                self.features,
-                self.edge_attr.size(-1),
-                hidden_dim,
-            ).to(DEVICE)
+            self.model = CrystalGNN(**init_dict).to(DEVICE)
+        elif architecture == "trans":
+            self.model = TransformerGNN(**init_dict).to(DEVICE)
+        elif architecture == "gat":
+            self.model = GATConvNN(**init_dict).to(DEVICE)
+        elif architecture == "gen":
+            self.model = GENConvNN(**init_dict).to(DEVICE)
+        elif architecture == "pdn":
+            self.model = PDNConvNN(**init_dict).to(DEVICE)
         else:
             # TODO handling
             self.model = None
+
+        # Does not improve performance
+        # feature_means = torch.zeros(self.features).to(DEVICE)
+        # for b in self.train_loader:
+        #     feature_means += b.y.mean(dim=0).squeeze()
+        # self.model.initialize_last_layer_bias(feature_means / len(self.train_loader))
 
         # Training details
         self.criterion = lambda output, target: (output - target).pow(2).sum()
@@ -92,6 +112,7 @@ class Trainer:
             self.model.train()
             total_loss = 0
             for batch in self.train_loader:
+                batch = batch.to(DEVICE)
                 y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
                 batch_y = batch.y
 
@@ -121,6 +142,7 @@ class Trainer:
             with torch.no_grad():
                 val_loss = 0
                 for batch in self.val_loader:
+                    batch = batch.to(DEVICE)
                     y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
                     batch_y = batch.y
 

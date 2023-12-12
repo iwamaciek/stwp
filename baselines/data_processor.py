@@ -11,10 +11,10 @@ from utils.get_data import BIG_AREA, SMALL_AREA
 
 class DataProcessor:
     def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False):
+        self.num_spatial_constants, self.num_temporal_constants = 0, 0
         self.data, self.feature_list = self.load_data(spatial_encoding=(spatial_encoding or additional_encodings), temporal_encoding=(temporal_encoding or additional_encodings))
         self.samples, self.latitude, self.longitude, self.num_features = self.data.shape
-        self.num_spatial_constants = self.num_features - len(self.feature_list)
-        self.num_features = self.num_features - self.num_spatial_constants
+        self.num_features = self.num_features - self.num_spatial_constants - self.num_temporal_constants
         self.neighbours, self.input_size = None, None
 
     def upload_data(self, data: np.array):
@@ -28,7 +28,7 @@ class DataProcessor:
                 self.input_size,
                 self.latitude,
                 self.longitude,
-                self.num_features + self.num_spatial_constants,
+                self.num_features + self.num_spatial_constants + self.num_temporal_constants,
             )
         )
         for i in range(self.samples - sequence_length + 1):
@@ -46,7 +46,7 @@ class DataProcessor:
                 self.longitude,
                 self.neighbours + 1,
                 self.input_size,
-                self.num_features + self.num_spatial_constants,
+                self.num_features + self.num_spatial_constants + self.num_spatial_constants,
             )
         )
         neigh_data[..., 0, :, :] = self.data
@@ -73,8 +73,7 @@ class DataProcessor:
         X = self.data[..., :input_size, :]
         return X, y
 
-    @staticmethod
-    def load_data(path=DATA_PATH, spatial_encoding=False, temporal_encoding=False):
+    def load_data(self, path=DATA_PATH, spatial_encoding=False, temporal_encoding=False):
         grib_data = cfgrib.open_datasets(path)
         surface = grib_data[0]
         hybrid = grib_data[1]
@@ -112,6 +111,7 @@ class DataProcessor:
                         spatial_encodings[:, i, j, idx] = np.repeat(v, data.shape[0])
 
             data = np.concatenate((data, spatial_encodings), axis=-1)
+            self.num_spatial_constants = 6
         
         if temporal_encoding:
 
@@ -134,6 +134,7 @@ class DataProcessor:
                             temporal_encodings[t, i, j, idx] = v
             
             data = np.concatenate((data, temporal_encodings), axis=-1)
+            self.num_temporal_constants = 4
 
         return data, feature_list
 

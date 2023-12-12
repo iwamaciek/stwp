@@ -3,7 +3,7 @@ import cdsapi
 c = cdsapi.Client()
 
 dataset = "reanalysis-era5-single-levels"
-path = "../data2021-2023.grib"
+path = "../data2020-2022.grib"
 
 BIG_AREA = [55.75, 13.25, 48, 25]  # for nn
 SMALL_AREA = [55, 14, 49, 25]

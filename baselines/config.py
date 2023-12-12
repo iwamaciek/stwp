@@ -7,3 +7,4 @@ FH = 1
 INPUT_SIZE = 5
 R = 2
 DATA_PATH = "../data2020-2022.grib"
+RANDOM_STATE = 42

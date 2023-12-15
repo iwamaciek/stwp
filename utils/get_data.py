@@ -3,7 +3,7 @@ import cdsapi
 c = cdsapi.Client()
 
 dataset = "reanalysis-era5-single-levels"
-path = "../data2020-2022.grib"
+path = "../data2019-2021.grib"
 
 BIG_AREA = [55.75, 13.25, 48, 25]  # for nn
 SMALL_AREA = [55, 14, 49, 25]
@@ -21,7 +21,7 @@ query_dict = {
         "total_cloud_cover",
         "total_precipitation",
     ],
-    "year": ["2020", "2021", "2022"],
+    "year": ["2019", "2020", "2021"],
     "month": [
         "01",
         "02",
@@ -79,7 +79,11 @@ query_dict = {
 }
 
 
-if __name__ == "__main__":
+def download_data():
     c.retrieve(dataset, query_dict, path)
+
+
+if __name__ == "__main__":
+    download_data()
 
 # ~ 24min

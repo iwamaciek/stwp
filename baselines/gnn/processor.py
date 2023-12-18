@@ -3,9 +3,13 @@ import torch
 import torch_geometric.data as data
 import copy
 import sys
-from torch.utils.data import RandomSampler
 from torch_geometric.loader import DataLoader
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    StandardScaler,
+    RobustScaler,
+    MaxAbsScaler,
+)
 from sklearn.utils import shuffle
 from baselines.config import (
     DEVICE,
@@ -13,6 +17,8 @@ from baselines.config import (
     INPUT_SIZE,
     TRAIN_RATIO,
     BATCH_SIZE,
+    R,
+    RANDOM_STATE,
 )
 
 sys.path.append("..")
@@ -20,10 +26,10 @@ from baselines.data_processor import DataProcessor
 
 
 class NNDataProcessor:
-    def __init__(self):
-        self.dataset, self.feature_list = DataProcessor.load_data(
-            spatial_encoding=False
-        )
+    def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False):
+        self.data_proc = DataProcessor(spatial_encoding=spatial_encoding, temporal_encoding=temporal_encoding, additional_encodings=additional_encodings)
+        self.dataset = self.data_proc.data
+        self.feature_list = self.data_proc.feature_list
         (
             self.num_samples,
             self.num_latitudes,
@@ -31,11 +37,20 @@ class NNDataProcessor:
             self.num_features,
         ) = self.dataset.shape
 
+        self.spatial_encoding = (spatial_encoding or additional_encodings)
+        self.temporal_encoding = (temporal_encoding or additional_encodings)
+        self.num_spatial_constants = self.data_proc.num_spatial_constants
+        self.num_temporal_constants = self.data_proc.num_temporal_constants
+        self.num_features = self.num_features - self.num_spatial_constants - self.num_temporal_constants
+
         self.train_loader = None
+        self.val_loader = None
         self.test_loader = None
 
         self.train_size = None
+        self.val_size = None
         self.test_size = None
+        self.scaler = None
         self.scalers = None
         self.edge_weights = None
         self.edge_index = None
@@ -43,36 +58,48 @@ class NNDataProcessor:
 
     def preprocess(self, subset=None):
         self.edge_index, self.edge_weights, self.edge_attr = self.create_edges()
-        X_train, X_test, y_train, y_test = self.train_test_split()
-        X, y = self.get_scalers(X_train, X_test, y_train, y_test)
-        self.train_loader, self.test_loader = self.get_loaders(X, y, subset)
+        X_train, X_test, y_train, y_test = self.train_val_test_split()
+        X, y = self.fit_transform_scalers(X_train, X_test, y_train, y_test)
+        self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
+            X, y, subset
+        )
 
-    def train_test_split(self):
-        processor = DataProcessor(self.dataset)
-        X, y = processor.preprocess(INPUT_SIZE, FH)
+    def train_val_test_split(self):
+        X, y = self.data_proc.preprocess(INPUT_SIZE, FH)
 
         self.num_samples = X.shape[0]
         self.train_size = int(self.num_samples * TRAIN_RATIO)
-        self.test_size = self.num_samples - self.train_size
+        self.val_size = self.train_size
+        self.test_size = self.num_samples - self.train_size - self.val_size
 
         X = X.reshape(
-            -1, self.num_latitudes * self.num_longitudes * INPUT_SIZE, self.num_features
+            -1,
+            self.num_latitudes * self.num_longitudes * INPUT_SIZE,
+            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
         )
 
-        X_train, X_test = X[: self.train_size], X[-self.test_size :]
-        y_train, y_test = y[: self.train_size], y[-self.test_size :]
+        return self.data_proc.train_val_test_split(X, y, split_type=3)
 
-        return X_train, X_test, y_train, y_test
+    def fit_transform_scalers(
+        self, X_train, X_test, y_train, y_test, scaler_type="standard"
+    ):
 
-    def get_scalers(self, X_train, X_test, y_train, y_test):
-        self.train_size = len(X_train)
-        self.test_size = len(X_test)
+        if scaler_type == "min_max":
+            self.scaler = MinMaxScaler()
+        elif scaler_type == "standard":
+            self.scaler = StandardScaler()
+        elif scaler_type == "max_abs":
+            self.scaler = MaxAbsScaler()
+        elif scaler_type == "robust":
+            self.scaler = RobustScaler()
+        else:
+            print(f"{scaler_type} scaler not implemented")
+            raise ValueError
 
-        scaler = StandardScaler()
-        self.scalers = [copy.deepcopy(scaler) for _ in range(self.num_features)]
+        self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.num_features)]
 
         Xi_shape = self.num_latitudes * self.num_longitudes * INPUT_SIZE
         yi_shape = self.num_latitudes * self.num_longitudes * FH
@@ -90,7 +117,9 @@ class NNDataProcessor:
                 .reshape((self.train_size, Xi_shape))
             )
             X_test[..., i] = (
-                self.scalers[i].transform(X_test_i).reshape((self.test_size, Xi_shape))
+                self.scalers[i]
+                .transform(X_test_i)
+                .reshape((self.test_size + self.val_size, Xi_shape))
             )
             y_train[..., i] = (
                 self.scalers[i]
@@ -98,14 +127,19 @@ class NNDataProcessor:
                 .reshape((self.train_size, yi_shape))
             )
             y_test[..., i] = (
-                self.scalers[i].transform(y_test_i).reshape((self.test_size, yi_shape))
+                self.scalers[i]
+                .transform(y_test_i)
+                .reshape((self.test_size + self.val_size, yi_shape))
             )
 
         X = np.concatenate((X_train, X_test), axis=0)
         y = np.concatenate((y_train, y_test), axis=0)
 
         X = X.reshape(
-            -1, self.num_latitudes * self.num_longitudes, INPUT_SIZE, self.num_features
+            -1,
+            self.num_latitudes * self.num_longitudes,
+            INPUT_SIZE,
+            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes, FH, self.num_features
@@ -115,108 +149,35 @@ class NNDataProcessor:
 
         return X, y
 
-    def create_edges(self):
+    def create_edges(self, r=R):
         def node_index(i, j, num_cols):
             return i * num_cols + j
 
         # edge aggregation unit
         u = 0.5
         edge_index = []
-        edge_weights = []
         edge_attr = []
-        for i in range(self.num_latitudes):
-            for j in range(self.num_longitudes):
+        _, indices = DataProcessor.count_neighbours(radius=r)
 
-                # Up
-                if i > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i - 1, j, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([u, 0, u])
-
-                # Left
-                if j > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i, j - 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([0, -u, u])
-
-                # Down
-                if i < self.num_latitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i + 1, j, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([-u, 0, u])
-
-                # Right
-                if j < self.num_longitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i, j + 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u)
-                    edge_attr.append([0, u, u])
-
-                # Up-Left
-                if i > 0 and j > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i - 1, j - 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([u, -u, np.sqrt(2 * u)])
-
-                # Up-Right
-                if i > 0 and j < self.num_longitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i - 1, j + 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([u, u, np.sqrt(2 * u)])
-
-                # Down-Left
-                if i < self.num_latitudes - 1 and j > 0:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i + 1, j - 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([-u, -u, np.sqrt(2 * u)])
-
-                # Down-Right
-                if i < self.num_latitudes - 1 and j < self.num_longitudes - 1:
-                    edge_index.append(
-                        [
-                            node_index(i, j, self.num_longitudes),
-                            node_index(i + 1, j + 1, self.num_longitudes),
-                        ]
-                    )
-                    edge_weights.append(u / np.sqrt(2 * u))
-                    edge_attr.append([-u, u, np.sqrt(2 * u)])
+        for la in range(self.num_latitudes):
+            for lo in range(self.num_longitudes):
+                for (i, j) in indices:
+                    if (
+                        -1 < la + i < self.num_latitudes
+                        and -1 < lo + j < self.num_longitudes
+                    ):
+                        edge_index.append(
+                            [
+                                node_index(la, lo, self.num_longitudes),
+                                node_index(la + i, lo + j, self.num_longitudes),
+                            ]
+                        )
+                        edge_attr.append(
+                            [u * i, u * j, np.sqrt((u * i) ** 2 + (u * j) ** 2)]
+                        )
 
         edge_index = torch.tensor(edge_index, dtype=torch.int64).t().to(DEVICE)
-        edge_weights = torch.tensor(edge_weights, dtype=torch.float32).to(DEVICE)
+        edge_weights = None
         edge_attr = torch.tensor(edge_attr, dtype=torch.float32).to(DEVICE)  # (e, 2)
 
         return edge_index, edge_weights, edge_attr
@@ -233,13 +194,16 @@ class NNDataProcessor:
             dataset.append(g)
 
         train_dataset = dataset[: self.train_size]
+        val_dataset = dataset[self.train_size : self.train_size + self.val_size]
         test_dataset = dataset[-self.test_size :]
         # random state for reproduction
-        train_dataset = shuffle(train_dataset, random_state=42)
-        test_dataset = shuffle(test_dataset, random_state=42)
+        train_dataset = shuffle(train_dataset, random_state=RANDOM_STATE)
+        val_dataset = shuffle(val_dataset, random_state=RANDOM_STATE)
+        test_dataset = shuffle(test_dataset, random_state=RANDOM_STATE)
 
         if subset is not None:
             train_dataset = train_dataset[: subset * BATCH_SIZE]
+            val_dataset = val_dataset[: subset * BATCH_SIZE]
             test_dataset = test_dataset[: subset * BATCH_SIZE]
 
         # if subset is None:
@@ -249,13 +213,50 @@ class NNDataProcessor:
         #     test_sampler = RandomSampler(test_dataset, num_samples=subset)
 
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
+        val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
         test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
-        return train_loader, test_loader
+        return train_loader, val_loader, test_loader
 
     def get_shapes(self):
         return (
             self.num_samples,
             self.num_latitudes,
             self.num_longitudes,
-            self.num_features,
+            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
         )
+
+    def map_latitude_longitude_span(
+        self, input_tensor, old_span=(32, 48), new_span=(25, 45), flat=True
+    ):
+        """
+        Maps latitude-longitude span e.g. (32,48) -> (25,45)
+        """
+        if flat:
+            batch_size = int(
+                input_tensor.shape[0] / self.num_latitudes / self.num_longitudes
+            )
+            input_tensor = input_tensor.reshape(
+                (
+                    batch_size,
+                    self.num_latitudes,
+                    self.num_longitudes,
+                    self.num_features,
+                    1,
+                )
+            )
+
+        old_lat, old_lon = old_span
+        new_lat, new_lon = new_span
+
+        lat_diff = old_lat - new_lat
+        left_lat = lat_diff // 2
+        right_lat = new_lat + lat_diff - left_lat - 1
+
+        lon_diff = old_lon - new_lon
+        up_lon = lon_diff // 2
+        down_lon = new_lon + lon_diff - up_lon - 1
+
+        mapped_tensor = input_tensor[:, left_lat:right_lat, up_lon:down_lon]
+        mapped_tensor.reshape(-1, self.num_features, mapped_tensor.shape[4])
+
+        return mapped_tensor

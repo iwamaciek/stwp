@@ -2,7 +2,7 @@ from torch import nn, cat
 from torch.nn.functional import relu
 
 class UNet(nn.Module):
-    def __init__(self, features=6, s=3, fh=2, base_units=16):
+    def __init__(self, features=6, out_features=6, s=3, fh=2, base_units=16):
         super().__init__()
         BASE = base_units
 
@@ -44,7 +44,7 @@ class UNet(nn.Module):
         self.dec32 = nn.Conv2d(BASE, BASE, kernel_size=3, padding=1, padding_mode='reflect')
         
         # Output
-        self.outconv = nn.Conv2d(BASE, fh*features, kernel_size=1)
+        self.outconv = nn.Conv2d(BASE, fh*out_features, kernel_size=1)
 
     def forward(self, X, *args):
         # Encode

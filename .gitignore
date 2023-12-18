@@ -13,3 +13,4 @@ emc.py
 *.zip
 gnn_test
 *.txt
+catboost_info

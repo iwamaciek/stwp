@@ -6,6 +6,8 @@ import json
 import cartopy.crs as ccrs
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+from torch_sparse import SparseTensor
+
 from baselines.gnn.processor import NNDataProcessor
 from baselines.data_processor import DataProcessor
 from baselines.config import DEVICE, FH, BATCH_SIZE
@@ -47,6 +49,7 @@ class Trainer:
         self.edge_index = self.nn_proc.edge_index
         self.edge_weights = self.nn_proc.edge_weights
         self.edge_attr = self.nn_proc.edge_attr
+        self.adj = self.nn_proc.adj
         self.scalers = self.nn_proc.scalers
         self.train_size = len(self.train_loader)
         self.val_size = len(self.val_loader)
@@ -102,6 +105,16 @@ class Trainer:
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path))
 
+    @staticmethod
+    def create_adj_matrix(edge_index):
+        num_nodes = edge_index.max().item() + 1
+        adj_sparse = SparseTensor(
+            row=edge_index[0], col=edge_index[1], sparse_sizes=(num_nodes, num_nodes)
+        )
+        adj_dense = adj_sparse.to_dense().to(DEVICE)
+        adj_dense = adj_dense + torch.eye(num_nodes).to(DEVICE)
+        return adj_dense
+
     def train(self, num_epochs=50):
         # gradient_clip = 32
         start = time.time()
@@ -114,7 +127,12 @@ class Trainer:
             total_loss = 0
             for batch in self.train_loader:
                 batch = batch.to(DEVICE)
-                y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
+                if batch.x.size(0) / self.latitude / self.longitude >= BATCH_SIZE:
+                    adj = self.adj
+                else:
+                    adj = self.create_adj_matrix(batch.edge_index)
+
+                y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr, adj)
                 batch_y = batch.y
 
                 if self.spatial_mapping:
@@ -144,7 +162,11 @@ class Trainer:
                 val_loss = 0
                 for batch in self.val_loader:
                     batch = batch.to(DEVICE)
-                    y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
+                    if batch.x.size(0) / self.latitude / self.longitude >= BATCH_SIZE:
+                        adj = self.adj
+                    else:
+                        adj = self.create_adj_matrix(batch.edge_index)
+                    y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr, adj)
                     batch_y = batch.y
 
                     if self.spatial_mapping:

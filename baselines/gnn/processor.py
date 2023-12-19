@@ -20,14 +20,24 @@ from baselines.config import (
     R,
     RANDOM_STATE,
 )
+from torch_sparse import SparseTensor
 
 sys.path.append("..")
 from baselines.data_processor import DataProcessor
 
 
 class NNDataProcessor:
-    def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False):
-        self.data_proc = DataProcessor(spatial_encoding=spatial_encoding, temporal_encoding=temporal_encoding, additional_encodings=additional_encodings)
+    def __init__(
+        self,
+        spatial_encoding=False,
+        temporal_encoding=False,
+        additional_encodings=False,
+    ):
+        self.data_proc = DataProcessor(
+            spatial_encoding=spatial_encoding,
+            temporal_encoding=temporal_encoding,
+            additional_encodings=additional_encodings,
+        )
         self.dataset = self.data_proc.data
         self.feature_list = self.data_proc.feature_list
         (
@@ -37,11 +47,13 @@ class NNDataProcessor:
             self.num_features,
         ) = self.dataset.shape
 
-        self.spatial_encoding = (spatial_encoding or additional_encodings)
-        self.temporal_encoding = (temporal_encoding or additional_encodings)
+        self.spatial_encoding = spatial_encoding or additional_encodings
+        self.temporal_encoding = temporal_encoding or additional_encodings
         self.num_spatial_constants = self.data_proc.num_spatial_constants
         self.num_temporal_constants = self.data_proc.num_temporal_constants
-        self.num_features = self.num_features - self.num_spatial_constants - self.num_temporal_constants
+        self.num_features = (
+            self.num_features - self.num_spatial_constants - self.num_temporal_constants
+        )
 
         self.train_loader = None
         self.val_loader = None
@@ -55,6 +67,7 @@ class NNDataProcessor:
         self.edge_weights = None
         self.edge_index = None
         self.edge_attr = None
+        self.adj = None
 
     def preprocess(self, subset=None):
         self.edge_index, self.edge_weights, self.edge_attr = self.create_edges()
@@ -63,6 +76,17 @@ class NNDataProcessor:
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
             X, y, subset
         )
+        self.adj = self.create_adj_matrix()
+
+    def create_adj_matrix(self):
+        edge_index = next(iter(self.train_loader)).edge_index
+        num_nodes = edge_index.max().item() + 1
+        adj_sparse = SparseTensor(
+            row=edge_index[0], col=edge_index[1], sparse_sizes=(num_nodes, num_nodes)
+        )
+        adj_dense = adj_sparse.to_dense().to(DEVICE)
+        adj_dense = adj_dense + torch.eye(num_nodes).to(DEVICE)
+        return adj_dense
 
     def train_val_test_split(self):
         X, y = self.data_proc.preprocess(INPUT_SIZE, FH)
@@ -75,7 +99,9 @@ class NNDataProcessor:
         X = X.reshape(
             -1,
             self.num_latitudes * self.num_longitudes * INPUT_SIZE,
-            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+            self.num_features
+            + self.num_spatial_constants
+            + self.num_temporal_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
@@ -139,7 +165,9 @@ class NNDataProcessor:
             -1,
             self.num_latitudes * self.num_longitudes,
             INPUT_SIZE,
-            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+            self.num_features
+            + self.num_spatial_constants
+            + self.num_temporal_constants,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes, FH, self.num_features
@@ -222,7 +250,9 @@ class NNDataProcessor:
             self.num_samples,
             self.num_latitudes,
             self.num_longitudes,
-            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+            self.num_features
+            + self.num_spatial_constants
+            + self.num_temporal_constants,
         )
 
     def map_latitude_longitude_span(

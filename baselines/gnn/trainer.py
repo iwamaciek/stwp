@@ -30,19 +30,20 @@ class Trainer:
         gamma=0.5,
         subset=None,
         spatial_mapping=True,
+        additional_encodings=True,
     ):
 
         # Full data preprocessing for nn input run in NNDataProcessor constructor
         # If subset param is given train_data and test_data will have len=subset
-        self.nn_proc = NNDataProcessor(spatial_encoding=False)
+        self.nn_proc = NNDataProcessor(additional_encodings=additional_encodings)
         self.nn_proc.preprocess(subset=subset)
         self.train_loader = self.nn_proc.train_loader
         self.val_loader = self.nn_proc.val_loader
         self.test_loader = self.nn_proc.test_loader
         self.feature_list = self.nn_proc.feature_list
         self.features = len(self.feature_list)
-        (_, self.latitude, self.longitude, self.constants) = self.nn_proc.get_shapes()
-        self.constants = self.constants - self.features
+        (_, self.latitude, self.longitude, self.features) = self.nn_proc.get_shapes()
+        self.constants = self.nn_proc.num_spatial_constants + self.nn_proc.num_temporal_constants
         self.edge_index = self.nn_proc.edge_index
         self.edge_weights = self.nn_proc.edge_weights
         self.edge_attr = self.nn_proc.edge_attr
@@ -58,10 +59,12 @@ class Trainer:
 
         # Architecture details
         init_dict = {
-            "input_features": self.features + self.constants,
+            "input_features": self.features,
             "output_features": self.features,
             "edge_dim": self.edge_attr.size(-1),
             "hidden_dim": hidden_dim,
+            "input_t_dim": self.nn_proc.num_temporal_constants,
+            "input_s_dim": self.nn_proc.num_spatial_constants,
         }
 
         if architecture == "cgcn":
@@ -113,7 +116,7 @@ class Trainer:
             total_loss = 0
             for batch in self.train_loader:
                 batch = batch.to(DEVICE)
-                y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
+                y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr, batch.time, batch.pos)
                 batch_y = batch.y
 
                 if self.spatial_mapping:
@@ -143,7 +146,7 @@ class Trainer:
                 val_loss = 0
                 for batch in self.val_loader:
                     batch = batch.to(DEVICE)
-                    y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr)
+                    y_hat = self.model(batch.x, batch.edge_index, batch.edge_attr, batch.time, batch.pos)
                     batch_y = batch.y
 
                     if self.spatial_mapping:
@@ -178,11 +181,11 @@ class Trainer:
         plt.legend()
         plt.show()
 
-    def inverse_normalization_predict(self, X, y, edge_index, edge_attr):
+    def inverse_normalization_predict(self, X, y, edge_index, edge_attr, s, t):
         y = y.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y = y.cpu().detach().numpy()
 
-        y_hat = self.model(X, edge_index, edge_attr)
+        y_hat = self.model(X, edge_index, edge_attr, t, s)
         y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features, FH))
         y_hat = y_hat.cpu().detach().numpy()
 
@@ -221,7 +224,7 @@ class Trainer:
 
         X, y = sample.x, sample.y
         y, y_hat = self.inverse_normalization_predict(
-            X, y, sample.edge_index, sample.edge_attr
+            X, y, sample.edge_index, sample.edge_attr, sample.pos, sample.time
         )
         latitude, longitude = self.latitude, self.longitude
 
@@ -288,7 +291,7 @@ class Trainer:
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, FH))
         for batch in loader:
             y_i, y_hat_i = self.inverse_normalization_predict(
-                batch.x, batch.y, batch.edge_index, batch.edge_attr
+                batch.x, batch.y, batch.edge_index, batch.edge_attr, batch.pos, batch.time
             )
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)

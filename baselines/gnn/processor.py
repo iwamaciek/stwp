@@ -29,6 +29,8 @@ class NNDataProcessor:
     def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False):
         self.data_proc = DataProcessor(spatial_encoding=spatial_encoding, temporal_encoding=temporal_encoding, additional_encodings=additional_encodings)
         self.dataset = self.data_proc.data
+        self.temporal_data = self.data_proc.temporal_data
+        self.spatial_data = self.data_proc.spatial_data
         self.feature_list = self.data_proc.feature_list
         (
             self.num_samples,
@@ -41,7 +43,6 @@ class NNDataProcessor:
         self.temporal_encoding = (temporal_encoding or additional_encodings)
         self.num_spatial_constants = self.data_proc.num_spatial_constants
         self.num_temporal_constants = self.data_proc.num_temporal_constants
-        self.num_features = self.num_features - self.num_spatial_constants - self.num_temporal_constants
 
         self.train_loader = None
         self.val_loader = None
@@ -75,7 +76,7 @@ class NNDataProcessor:
         X = X.reshape(
             -1,
             self.num_latitudes * self.num_longitudes * INPUT_SIZE,
-            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+            self.num_features,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
@@ -139,7 +140,7 @@ class NNDataProcessor:
             -1,
             self.num_latitudes * self.num_longitudes,
             INPUT_SIZE,
-            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+            self.num_features,
         )
         y = y.reshape(
             -1, self.num_latitudes * self.num_longitudes, FH, self.num_features
@@ -187,8 +188,16 @@ class NNDataProcessor:
         for i in range(X.shape[0]):
             Xi = torch.from_numpy(X[i].astype("float32")).to(DEVICE)
             yi = torch.from_numpy(y[i].astype("float32")).to(DEVICE)
+            if self.temporal_encoding:
+                ti = torch.from_numpy(self.temporal_data[i].astype("float32")).to(DEVICE)
+            else: 
+                ti = None
+            if self.spatial_encoding:
+                si = torch.from_numpy(self.spatial_data.astype("float32")).to(DEVICE)
+            else:
+                si = None
             g = data.Data(
-                x=Xi, edge_index=self.edge_index, edge_attr=self.edge_attr, y=yi
+                x=Xi, edge_index=self.edge_index, edge_attr=self.edge_attr, y=yi, pos=si, time=ti
             )
             g = g.to(DEVICE)
             dataset.append(g)
@@ -222,7 +231,7 @@ class NNDataProcessor:
             self.num_samples,
             self.num_latitudes,
             self.num_longitudes,
-            self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+            self.num_features
         )
 
     def map_latitude_longitude_span(

@@ -1,13 +1,19 @@
 from torch import nn, cat
 from torch.nn.functional import relu
+from baselines.config import BATCH_SIZE
 
 class UNet(nn.Module):
-    def __init__(self, features=6, out_features=6, s=3, fh=2, base_units=16):
+    def __init__(self, features=6, spatial_features=6, temporal_features=4, out_features=6, lat=32, lon=48, s=3, fh=2, base_units=16):
         super().__init__()
         BASE = base_units
+        self.lat = lat
+        self.lon = lon
+        self.mlp_embedder = nn.Linear(s*features, BASE)
+        self.temporal_embedder = nn.Linear(s*temporal_features, lat*lon)
+        enc11_input_size = BASE + 1 + spatial_features
 
         # Encoder
-        self.enc11 = nn.Conv2d(s*features, BASE, kernel_size=3, padding=1, padding_mode='reflect')
+        self.enc11 = nn.Conv2d(enc11_input_size, BASE, kernel_size=3, padding=1, padding_mode='reflect')
         self.enc12 = nn.Conv2d(BASE, BASE, kernel_size=3, padding=1, padding_mode='reflect')
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
@@ -46,9 +52,20 @@ class UNet(nn.Module):
         # Output
         self.outconv = nn.Conv2d(BASE, fh*out_features, kernel_size=1)
 
-    def forward(self, X, *args):
+    def forward(self, X, t, s, *args):
+        print(f"INPUT: X:{X.shape}, t:{t.shape}, s:{s.shape}")
+        # Embed features
+        Xe = relu(self.mlp_embedder(X))
+        print(f"X embedding: {Xe.shape}")
+        te = self.temporal_embedder(t.reshape(BATCH_SIZE, 1, -1)).relu().permute((0,2,1))
+        print(f"t embeding: {te.shape}")
+        concat = cat((Xe, te, s), dim=-1)
+        print(f"Concat before reshape: {concat.shape}")
+        concat = concat.permute((0, 2, 1))
+        concat = concat.reshape(concat.shape[:-1]+(self.lat, self.lon,))
+        print(f"What goes into unet: {concat.shape}")
         # Encode
-        xe11 = relu(self.enc11(X))
+        xe11 = relu(self.enc11(concat))
         xe12 = relu(self.enc12(xe11))
         xp1 = self.pool1(xe12)
 
@@ -90,4 +107,5 @@ class UNet(nn.Module):
 
         # Out
         out = self.outconv(xd32)
+        print(f"What goes out: {out.shape}")
         return out

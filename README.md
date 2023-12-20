@@ -22,7 +22,7 @@ pip install torch-geometric-temporal
 <!-- Instruction [here](pre-commit-instruction.md). -->
 ```shell
 pip install -r requirements.txt
-pre-commits install
+pre-commit install
 ```
 
 ### Hyperparameter optimization

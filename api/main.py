@@ -1,4 +1,5 @@
 import shutil
+import json
 import os
 import zipfile
 from fastapi import FastAPI, Query
@@ -12,15 +13,15 @@ import matplotlib.pyplot as plt
 
 app = FastAPI()
 
-grib_data = cfgrib.open_datasets("2022_10_18.grib")
+with open("data.json","r") as file:
+    json_data = json.load(file)
 
-lat_min = min(grib_data[0].coords["latitude"].values)
-lat_max = max(grib_data[0].coords["latitude"].values)
-lng_min = min(grib_data[0].coords["longitude"].values)
-lng_max = max(grib_data[0].coords["longitude"].values)
+lat_min = float(min(json_data.keys()))
+lat_max = float(max(json_data.keys()))
+lng_min = float(min(json_data[str(lat_min)].keys()))
+lng_max = float(max(json_data[str(lat_min)].keys()))
 
 coord_acc = 0.25
-
 
 def get_fractions(lat, lng):
 
@@ -45,9 +46,6 @@ def interpolate_value(array, lat, lng):
 
     lat_frac, lng_frac = get_fractions(lat, lng)
 
-    # lat_frac = (lat - lat_min) * 4 - lat_index
-    # lng_frac = (lng - lng_min) * 4 - lng_index
-
     if lat == lat_max and lng == lng_max:
         return array[lat_index, lng_index]
     elif lat == lat_max:
@@ -69,30 +67,27 @@ def interpolate_value(array, lat, lng):
 
 def get_values_by_lat_lng(lat, lng):
 
-    surface = grib_data[0]
-    hybrid = grib_data[1]
+    lat, lng = str(lat), str(lng)
 
-    timestamps = surface.time.values.astype(str)
-
-    tp = hybrid.tp.to_numpy() * 1000
-    if tp.ndim >= 4:
-        tp = tp.reshape((-1,) + hybrid.tp.shape[2:])
+    timestamps = json_data[lat][lng]["t2m"].keys()
 
     features = {
-        "sp": surface.sp.to_numpy() / 100,
-        "tcc": surface.tcc.to_numpy(),
-        "tp": tp,
-        "u10": surface.u10.to_numpy() * 3.6,
-        "v10": surface.v10.to_numpy() * 3.6,
-        "t2m": surface.t2m.to_numpy() - 273.15,
+        "sp": np.array([[[json_data[lat][lng]["sp"][timestamp] for timestamp in json_data[lat][lng]["sp"]] for lng in json_data[lat]] for lat in json_data]),
+        "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
+        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] * 1000 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
+        "u10": np.array([[[json_data[lat][lng]["u10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["u10"]] for lng in json_data[lat]] for lat in json_data]),
+        "v10": np.array([[[json_data[lat][lng]["v10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["v10"]] for lng in json_data[lat]] for lat in json_data]),
+        "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
     }
+
+    lat, lng = float(lat), float(lng)
 
     response = {"lat": lat, "lng": lng, "timestamps": []}
 
     for i, timestamp in enumerate(timestamps):
         data = {"timestamp": timestamp, "values": {}}
         for feature in features:
-            value = round(float(interpolate_value(features[feature][i], lat, lng)), 2)
+            value = float(interpolate_value(features[feature][:, :, i], lat, lng))
             data["values"][feature] = value
         response["timestamps"].append(data)
 
@@ -100,24 +95,14 @@ def get_values_by_lat_lng(lat, lng):
 
 
 def create_maps():
-    surface = grib_data[0]
-    hybrid = grib_data[1]
-
-    tp = hybrid.tp.to_numpy() * 1000
-    if tp.ndim >= 4:
-        tp = tp.reshape((-1,) + hybrid.tp.shape[2:])
-
-    # pprint(tp)
-
-    lats = surface.coords["latitude"].values
-    lons = surface.coords["longitude"].values
+    lats = np.arange(lat_max, lat_min - coord_acc, -coord_acc)
+    lons = np.arange(lng_min, lng_max + coord_acc, coord_acc)
 
     features = {
-        "tp": tp,
-        "tcc": surface.tcc.to_numpy(),
-        "t2m": surface.t2m.to_numpy() - 273.15,
+        "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
+        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] * 1000 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
+        "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
     }
-
     colors = {"tp": "Blues", "tcc": "Greens", "t2m": "coolwarm"}
 
     ranges = {
@@ -127,7 +112,8 @@ def create_maps():
     }
 
     for feature_name, feature in features.items():
-        for i, data in enumerate(feature):
+        for i in range(feature.shape[2]):
+            data = feature[:, :, i]
             map_crs = ccrs.Mercator(central_longitude=40)
             data_crs = ccrs.PlateCarree()
 
@@ -141,12 +127,10 @@ def create_maps():
             gl = ax.gridlines(draw_labels=False, linewidth=0, linestyle="--")
             levels = ranges.get(feature_name)
             cmap = plt.colormaps[colors.get(feature_name)]
-            cmap.set_bad(alpha=0)  # Set white/zero values as transparent
 
             cf = ax.contourf(
                 lons, lats, data, levels=levels, cmap=cmap, transform=data_crs
             )
-
             ax.add_feature(cfeature.BORDERS)
 
             # Remove axis and labels
@@ -156,9 +140,10 @@ def create_maps():
             if not os.path.exists("./maps"):
                 os.mkdir("maps")
             plt.savefig(
-                f"./maps/{feature_name}" + str(i + 1) + ".png",
+                f"./maps/{feature_name}" + str(i) + ".png",
                 bbox_inches="tight",
                 pad_inches=0,
+                transparent=True,
             )
 
             plt.clf()
@@ -204,7 +189,7 @@ if __name__ == "__main__":
 
     # pprint(grib_data)
 
-    # val = get_values_by_lat_lng(grib_data, 55.75, 14.25)
+    # val = get_values_by_lat_lng(53.0, 17.0)
     # paint_map(grib_data)
 
     # pprint(val)

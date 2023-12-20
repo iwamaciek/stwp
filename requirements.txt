@@ -20,3 +20,5 @@ fastapi
 uvicorn
 pygrib
 catboost
+fastapi
+uvicorn

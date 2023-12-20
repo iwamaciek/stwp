@@ -4,7 +4,6 @@ import os
 import zipfile
 from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse
-import cfgrib
 from pprint import pprint
 import numpy as np
 import cartopy.crs as ccrs

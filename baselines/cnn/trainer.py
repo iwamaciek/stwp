@@ -50,7 +50,7 @@ class Trainer(GNNTrainer):
             base_units=base_units
             ).to(DEVICE)
 
-        self.criterion = torch.nn.MSELoss()
+        self.criterion = torch.nn.L1Loss()
         self.lr = lr
         self.gamma = gamma
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)

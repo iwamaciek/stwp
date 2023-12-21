@@ -17,12 +17,18 @@ class DataProcessor:
         additional_encodings=False,
     ):
         self.num_spatial_constants, self.num_temporal_constants = 0, 0
-        self.data, self.feature_list = self.load_data(
-            spatial_encoding=(spatial_encoding or additional_encodings),
-            temporal_encoding=(temporal_encoding or additional_encodings),
+        self.temporal_encoding = temporal_encoding or additional_encodings
+        self.spatial_encoding = spatial_encoding or additional_encodings
+        (
+            self.data,
+            self.feature_list,
+            self.temporal_data,
+            self.spatial_data,
+        ) = self.load_data(
+            spatial_encoding=self.spatial_encoding,
+            temporal_encoding=self.temporal_encoding,
         )
         self.samples, self.latitude, self.longitude, self.num_features = self.data.shape
-        self.num_features = self.num_features - self.num_spatial_constants - self.num_temporal_constants
         self.neighbours, self.input_size = None, None
 
     def upload_data(self, data: np.array):
@@ -36,7 +42,7 @@ class DataProcessor:
                 self.input_size,
                 self.latitude,
                 self.longitude,
-                self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+                self.num_features,
             )
         )
         for i in range(self.samples - sequence_length + 1):
@@ -44,6 +50,29 @@ class DataProcessor:
         sequences = sequences.transpose((0, 2, 3, 1, 4))
         self.samples = sequences.shape[0]
         self.data = sequences
+        if self.temporal_encoding:
+            time_sequences = np.empty(
+                (
+                    self.samples - self.input_size + 1,
+                    self.num_temporal_constants,
+                )
+            )
+            for i in range(self.samples - sequence_length + 1):
+                time_sequences[i] = self.temporal_data[
+                    i + INPUT_SIZE
+                ]  # Get time for the last timestamp for x
+            self.temporal_data = time_sequences
+        if self.spatial_encoding:
+            spatial_sequences = np.empty(
+                (
+                    self.samples - self.input_size + 1,
+                    self.latitude * self.longitude,
+                    self.num_spatial_constants,
+                )
+            )
+            for i in range(self.samples - sequence_length + 1):
+                spatial_sequences[i] = self.spatial_data
+            self.spatial_data = spatial_sequences
 
     def create_neighbours(self, radius):
         self.neighbours, indices = self.count_neighbours(radius=radius)
@@ -54,7 +83,9 @@ class DataProcessor:
                 self.longitude,
                 self.neighbours + 1,
                 self.input_size,
-                self.num_features + self.num_spatial_constants + self.num_temporal_constants,
+                self.num_features
+                + self.num_spatial_constants
+                + self.num_temporal_constants,
             )
         )
         neigh_data[..., 0, :, :] = self.data
@@ -81,7 +112,9 @@ class DataProcessor:
         X = self.data[..., :input_size, :]
         return X, y
 
-    def load_data(self, path=DATA_PATH, spatial_encoding=False, temporal_encoding=False):
+    def load_data(
+        self, path=DATA_PATH, spatial_encoding=False, temporal_encoding=False
+    ):
         grib_data = cfgrib.open_datasets(path)
         surface = grib_data[0]
         hybrid = grib_data[1]
@@ -101,9 +134,9 @@ class DataProcessor:
             lsm = surface.lsm.to_numpy()
             z = surface.z.to_numpy()
             z = (z - z.mean()) / z.std()
-            data = np.concatenate((data, np.stack((lsm, z), axis=-1)), axis=-1)
+            stacked = np.stack([lsm, z], axis=-1)
 
-            spatial_encodings = np.empty(data.shape[:-1] + (4,))
+            spatial_encodings = np.empty(data.shape[1:-1] + (4,))
 
             latitudes = np.array(surface.latitude)
             longitudes = np.array(surface.longitude)
@@ -117,36 +150,39 @@ class DataProcessor:
                             trig_encode(lon, 360, "cos"),
                         ]
                     ):
-                        spatial_encodings[:, i, j, idx] = np.repeat(v, data.shape[0])
+                        spatial_encodings[i, j, idx] = v
 
-            data = np.concatenate((data, spatial_encodings), axis=-1)
-            self.num_spatial_constants = 6
-        
+            spatial_data = np.concatenate([stacked[0], spatial_encodings], axis=-1)
+            self.num_spatial_constants = spatial_data.shape[-1]
+            spatial_data = spatial_data.reshape(
+                (1, len(latitudes) * len(longitudes), self.num_spatial_constants)
+            )
+        else:
+            spatial_data = None
+
         if temporal_encoding:
 
             dt = surface.time.to_numpy()
             dt = np.fromiter((datetime64_to_datetime(ti) for ti in dt), dtype=datetime)
 
-            temporal_encodings = np.empty(data.shape[:-1] + (4,))
+            temporal_data = np.empty((data.shape[0], 4))
 
             for t in range(data.shape[0]):
-                for i in range(data.shape[1]):
-                    for j in range(data.shape[2]):
-                        for idx, v in enumerate(
-                            [
-                                trig_encode(get_day_of_year(dt[t]), 365, "sin"),
-                                trig_encode(get_day_of_year(dt[t]), 365, "cos"),
-                                trig_encode(dt[t].hour, 24, "sin"),
-                                trig_encode(dt[t].hour, 24, "cos"),
-                            ]
-                        ):
-                            temporal_encodings[t, i, j, idx] = v
+                for idx, v in enumerate(
+                    [
+                        trig_encode(get_day_of_year(dt[t]), 365, "sin"),
+                        trig_encode(get_day_of_year(dt[t]), 365, "cos"),
+                        trig_encode(dt[t].hour, 24, "sin"),
+                        trig_encode(dt[t].hour, 24, "cos"),
+                    ]
+                ):
+                    temporal_data[t, idx] = v
 
-            data = np.concatenate((data, temporal_encodings), axis=-1)
-            # self.temporal_data = temporal_encodings
-            self.num_temporal_constants = 4 # temporal_encodings.shape[-1]
+            self.num_temporal_constants = temporal_data.shape[-1]
+        else:
+            temporal_data = None
 
-        return data, feature_list
+        return data, feature_list, temporal_data, spatial_data
 
     @staticmethod
     def train_test_split(X, y, split_ratio=TRAIN_RATIO):

@@ -8,3 +8,4 @@ INPUT_SIZE = 5
 R = 2
 DATA_PATH = "../data/data2019-2021-small.grib"
 RANDOM_STATE = 42
+INPUT_DIMS = [32, 48]

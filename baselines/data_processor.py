@@ -123,7 +123,7 @@ class DataProcessor:
         tcc = surface.tcc.to_numpy()
         u10 = surface.u10.to_numpy()
         v10 = surface.v10.to_numpy()
-        tp = hybrid.tp.to_numpy()
+        tp = hybrid.tp.to_numpy()  # * 1000
         if tp.ndim >= 4:
             tp = tp.reshape((-1,) + hybrid.tp.shape[2:])
         data = np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)

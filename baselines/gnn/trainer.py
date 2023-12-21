@@ -91,7 +91,9 @@ class Trainer:
         # self.model.initialize_last_layer_bias(feature_means / len(self.train_loader))
 
         # Training details
-        self.criterion = lambda output, target: (output - target).pow(2).sum()
+        self.criterion = (
+            torch.nn.L1Loss()
+        )  # lambda output, target: (output - target).pow(2).sum()
         self.lr = lr
         self.gamma = gamma
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -128,7 +130,7 @@ class Trainer:
                     y_hat = self.nn_proc.map_latitude_longitude_span(y_hat)
                     batch_y = self.nn_proc.map_latitude_longitude_span(batch.y)
 
-                loss = self.criterion(y_hat, batch_y) / BATCH_SIZE
+                loss = self.criterion(y_hat, batch_y)  # / BATCH_SIZE
                 loss.backward()
 
                 # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
@@ -164,7 +166,7 @@ class Trainer:
                         y_hat = self.nn_proc.map_latitude_longitude_span(y_hat)
                         batch_y = self.nn_proc.map_latitude_longitude_span(batch.y)
 
-                    loss = self.criterion(y_hat, batch_y) / BATCH_SIZE
+                    loss = self.criterion(y_hat, batch_y)  # / BATCH_SIZE
                     val_loss += loss.item()
 
             avg_val_loss = val_loss / min(self.subset, self.val_size)

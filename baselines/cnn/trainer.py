@@ -12,22 +12,22 @@ import time
 
 class Trainer(GNNTrainer):
     def __init__(self, base_units=16, lr=0.001, gamma=0.5, subset=None, spatial_mapping=True) -> None:
-        self.data_processor = CNNDataProcessor(additional_encodings=True)
-        self.data_processor.preprocess(subset=subset)
-        self.nn_proc = self.data_processor
-        self.train_loader = self.data_processor.train_loader
-        self.val_loader = self.data_processor.val_loader
-        self.test_loader = self.data_processor.test_loader
-        self.feature_list = self.data_processor.feature_list
+        self.nn_proc = CNNDataProcessor(additional_encodings=True)
+        self.nn_proc.preprocess(subset=subset)
+        self.train_loader = self.nn_proc.train_loader
+        self.val_loader = self.nn_proc.val_loader
+        self.test_loader = self.nn_proc.test_loader
+        self.feature_list = self.nn_proc.feature_list
         self.features = len(self.feature_list)
         (
             _,
             self.latitude,
             self.longitude,
-            self.total_features,
-        ) = self.data_processor.get_shapes()
-
-        self.scalers = self.data_processor.scalers
+            self.num_features,
+        ) = self.nn_proc.get_shapes()
+        self.num_temporal_features = self.nn_proc.num_temporal_constants
+        self.num_spatial_features = self.nn_proc.num_spatial_constants
+        self.scalers = self.nn_proc.scalers
         self.train_size = len(self.train_loader)
         self.val_size = len(self.val_loader)
         self.test_size = len(self.test_loader)
@@ -40,9 +40,17 @@ class Trainer(GNNTrainer):
         else:
             self.subset = subset
 
-        self.model = UNet(features=self.total_features, out_features=self.features, s=INPUT_SIZE, fh=FH, base_units=base_units).to(DEVICE)
+        self.model = UNet(
+            features=self.num_features,
+            spatial_features=self.num_spatial_features,
+            temporal_features=self.num_temporal_features,
+            out_features=self.features,
+            s=INPUT_SIZE,
+            fh=FH,
+            base_units=base_units
+            ).to(DEVICE)
 
-        self.criterion = torch.nn.MSELoss()
+        self.criterion = torch.nn.L1Loss()
         self.lr = lr
         self.gamma = gamma
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -63,17 +71,19 @@ class Trainer(GNNTrainer):
             self.model.train()
             total_loss = 0
             for batch in self.train_loader:
-                if batch.x.shape[0] < BATCH_SIZE:
-                    continue
-                inputs = batch.x.reshape(-1, self.latitude, self.longitude, INPUT_SIZE*self.total_features).permute((0, 3, 1, 2)).to(DEVICE)
+                # if batch.x.shape[0] < BATCH_SIZE:
+                #     continue
+                inputs = batch.x.reshape(-1, self.latitude, self.longitude, INPUT_SIZE*self.features).permute((0, 3, 1, 2)).to(DEVICE)
                 labels = batch.y.reshape(-1, self.latitude, self.longitude, FH*self.features).permute((0, 3, 1, 2)).to(DEVICE)
+                t = batch.time.to(DEVICE)
+                s = batch.pos.to(DEVICE)
                 self.optimizer.zero_grad()
 
-                outputs = self.model(inputs)
+                outputs = self.model(inputs, t, s)
 
                 if self.spatial_mapping:
-                    labels = self.data_processor.map_latitude_longitude_span(labels)
-                    outputs = self.data_processor.map_latitude_longitude_span(outputs)
+                    labels = self.nn_proc.map_latitude_longitude_span(labels)
+                    outputs = self.nn_proc.map_latitude_longitude_span(outputs)
 
                 loss = self.criterion(outputs, labels)
                 loss.backward()
@@ -90,13 +100,18 @@ class Trainer(GNNTrainer):
             with torch.no_grad():
                 val_loss = 0
                 for batch in self.val_loader:
-                    inputs = batch.x.reshape(-1, self.latitude, self.longitude, INPUT_SIZE*self.total_features).permute((0, 3, 1, 2)).to(DEVICE)
+                    # if batch.x.shape[0] < BATCH_SIZE:
+                    #     continue
+                    inputs = batch.x.reshape(-1, self.latitude, self.longitude, INPUT_SIZE*self.features).permute((0, 3, 1, 2)).to(DEVICE)
                     labels = batch.y.reshape(-1, self.latitude, self.longitude, FH*self.features).permute((0, 3, 1, 2)).to(DEVICE)
-                    outputs = self.model(inputs)
+                    t = batch.time.to(DEVICE)
+                    s = batch.pos.to(DEVICE)
+
+                    outputs = self.model(inputs, t, s)
                     
                     if self.spatial_mapping:
-                        labels = self.data_processor.map_latitude_longitude_span(labels)
-                        outputs = self.data_processor.map_latitude_longitude_span(outputs)
+                        labels = self.nn_proc.map_latitude_longitude_span(labels)
+                        outputs = self.nn_proc.map_latitude_longitude_span(outputs)
                     
                     loss = self.criterion(outputs, labels)
                     val_loss += loss.item()
@@ -115,9 +130,9 @@ class Trainer(GNNTrainer):
         print(f"{end - start} [s]")
         self.plot_loss(val_loss_list, train_loss_list)
 
-    def inverse_normalization_predict(self, X, y, *args):
-        X = X.reshape(-1, self.latitude, self.longitude, INPUT_SIZE*self.total_features).permute((0, 3, 1, 2)).to(DEVICE)
-        y_hat = self.model(X)
+    def inverse_normalization_predict(self, X, y, edge_index, edge_attr, pos, time):
+        X = X.reshape(-1, self.latitude, self.longitude, INPUT_SIZE*self.features).permute((0, 3, 1, 2)).to(DEVICE)
+        y_hat = self.model(X, time, pos)
         y_hat = y_hat.permute((0, 2, 3, 1)).reshape(-1, self.latitude, self.longitude, FH, self.features).permute((0, 1, 2, 4, 3))
         y_hat = y_hat.cpu().detach().numpy()
 

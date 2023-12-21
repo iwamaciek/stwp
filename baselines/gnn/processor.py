@@ -19,8 +19,6 @@ from baselines.config import (
     BATCH_SIZE,
     R,
     RANDOM_STATE,
-    INPUT_DIMS,
-    OUTPUT_DIMS,
 )
 
 sys.path.append("..")
@@ -253,7 +251,7 @@ class NNDataProcessor:
         )
 
     def map_latitude_longitude_span(
-        self, input_tensor, old_span=INPUT_DIMS, new_span=OUTPUT_DIMS, flat=True
+        self, input_tensor, old_span=(32, 48), new_span=(25, 45), flat=True
     ):
         """
         Maps latitude-longitude span e.g. (32,48) -> (25,45)

@@ -13,7 +13,6 @@ from baselines.gnn.processor import NNDataProcessor
 class CNNDataProcessor(NNDataProcessor):
     def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False) -> None:
         super().__init__(spatial_encoding=spatial_encoding, temporal_encoding=temporal_encoding, additional_encodings=additional_encodings)
-        self.total_features = self.num_features + self.num_spatial_constants + self.num_temporal_constants
 
     def preprocess(self, subset=None):
         X_train, X_test, y_train, y_test = self.train_val_test_split()
@@ -21,7 +20,7 @@ class CNNDataProcessor(NNDataProcessor):
         X = X.transpose((0, 1, 3, 2))
         y = y.transpose((0, 1, 3, 2))
         X = X.reshape(
-            -1, self.num_latitudes, self.num_longitudes, INPUT_SIZE, self.total_features
+            -1, self.num_latitudes, self.num_longitudes, INPUT_SIZE, self.num_features
         )
         y = y.reshape(
             -1, self.num_latitudes, self.num_longitudes, FH, self.num_features

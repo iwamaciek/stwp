@@ -5,7 +5,7 @@ import cartopy.crs as ccrs
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.dummy import DummyRegressor
-from baselines.data_processor import DataProcessor
+from models.data_processor import DataProcessor
 from sklearn.preprocessing import (
     MinMaxScaler,
     StandardScaler,
@@ -185,9 +185,10 @@ class BaselineRegressor:
             y_hat = self.predict_autoreg(X_test, y_test)
         return y_hat
 
-    def predict_and_evaluate(self, X_test, y_test, max_samples=5):
+    def predict_and_evaluate(self, X_test, y_test, plot=True, max_samples=5):
         y_hat = self.predict_(X_test, y_test)
-        self.plot_predictions(y_hat, y_test, max_samples=max_samples)
+        if plot:
+            self.plot_predictions(y_hat, y_test, max_samples=max_samples)
         eval_scores = self.evaluate(y_hat, y_test)
         mae_scores = self.get_mae(y_hat, y_test)
         print("=======================================")

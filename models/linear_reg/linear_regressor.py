@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from baselines.baseline_regressor import BaselineRegressor
+from models.baseline_regressor import BaselineRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 import copy
 

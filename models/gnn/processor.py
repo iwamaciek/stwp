@@ -11,18 +11,10 @@ from sklearn.preprocessing import (
     MaxAbsScaler,
 )
 from sklearn.utils import shuffle
-from baselines.config import (
-    DEVICE,
-    FH,
-    INPUT_SIZE,
-    TRAIN_RATIO,
-    BATCH_SIZE,
-    R,
-    RANDOM_STATE,
-)
+from models.config import config as cfg
 
 sys.path.append("..")
-from baselines.data_processor import DataProcessor
+from models.data_processor import DataProcessor
 
 
 class NNDataProcessor:
@@ -37,7 +29,7 @@ class NNDataProcessor:
             temporal_encoding=temporal_encoding,
             additional_encodings=additional_encodings,
         )
-        self.dataset = self.data_proc.data
+        self.raw_data = self.data_proc.data
         self.temporal_data = self.data_proc.temporal_data
         self.spatial_data = self.data_proc.spatial_data
         self.feature_list = self.data_proc.feature_list
@@ -46,7 +38,7 @@ class NNDataProcessor:
             self.num_latitudes,
             self.num_longitudes,
             self.num_features,
-        ) = self.dataset.shape
+        ) = self.raw_data.shape
 
         self.spatial_encoding = spatial_encoding or additional_encodings
         self.temporal_encoding = temporal_encoding or additional_encodings
@@ -65,6 +57,11 @@ class NNDataProcessor:
         self.edge_weights = None
         self.edge_index = None
         self.edge_attr = None
+        self.cfg = cfg
+
+    def update(self, c):
+        self.data_proc.upload_data(self.raw_data)
+        self.cfg = c
 
     def preprocess(self, subset=None):
         self.edge_index, self.edge_weights, self.edge_attr = self.create_edges()
@@ -75,20 +72,22 @@ class NNDataProcessor:
         )
 
     def train_val_test_split(self):
-        X, y = self.data_proc.preprocess(INPUT_SIZE, FH)
+        X, y = self.data_proc.preprocess(self.cfg.INPUT_SIZE, self.cfg.FH)
 
         self.num_samples = X.shape[0]
-        self.train_size = int(self.num_samples * TRAIN_RATIO)
+        self.train_size = int(self.num_samples * self.cfg.TRAIN_RATIO)
         self.val_size = self.train_size
         self.test_size = self.num_samples - self.train_size - self.val_size
 
         X = X.reshape(
             -1,
-            self.num_latitudes * self.num_longitudes * INPUT_SIZE,
+            self.num_latitudes * self.num_longitudes * self.cfg.INPUT_SIZE,
             self.num_features,
         )
         y = y.reshape(
-            -1, self.num_latitudes * self.num_longitudes * FH, self.num_features
+            -1,
+            self.num_latitudes * self.num_longitudes * self.cfg.FH,
+            self.num_features,
         )
 
         return self.data_proc.train_val_test_split(X, y, split_type=3)
@@ -111,8 +110,8 @@ class NNDataProcessor:
 
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.num_features)]
 
-        Xi_shape = self.num_latitudes * self.num_longitudes * INPUT_SIZE
-        yi_shape = self.num_latitudes * self.num_longitudes * FH
+        Xi_shape = self.num_latitudes * self.num_longitudes * self.cfg.INPUT_SIZE
+        yi_shape = self.num_latitudes * self.num_longitudes * self.cfg.FH
 
         for i in range(self.num_features):
             X_train_i = X_train[..., i].reshape(-1, 1)
@@ -148,18 +147,21 @@ class NNDataProcessor:
         X = X.reshape(
             -1,
             self.num_latitudes * self.num_longitudes,
-            INPUT_SIZE,
+            self.cfg.INPUT_SIZE,
             self.num_features,
         )
         y = y.reshape(
-            -1, self.num_latitudes * self.num_longitudes, FH, self.num_features
+            -1, self.num_latitudes * self.num_longitudes, self.cfg.FH, self.num_features
         )
         X = X.transpose((0, 1, 3, 2))
         y = y.transpose((0, 1, 3, 2))
 
         return X, y
 
-    def create_edges(self, r=R):
+    def create_edges(self, r=None):
+        if r is None:
+            r = self.cfg.R
+
         def node_index(i, j, num_cols):
             return i * num_cols + j
 
@@ -186,25 +188,27 @@ class NNDataProcessor:
                             [u * i, u * j, np.sqrt((u * i) ** 2 + (u * j) ** 2)]
                         )
 
-        edge_index = torch.tensor(edge_index, dtype=torch.int64).t().to(DEVICE)
+        edge_index = torch.tensor(edge_index, dtype=torch.int64).t().to(self.cfg.DEVICE)
         edge_weights = None
-        edge_attr = torch.tensor(edge_attr, dtype=torch.float32).to(DEVICE)  # (e, 2)
+        edge_attr = torch.tensor(edge_attr, dtype=torch.float32).to(self.cfg.DEVICE)
 
         return edge_index, edge_weights, edge_attr
 
     def get_loaders(self, X, y, subset=None):
         dataset = []
         for i in range(X.shape[0]):
-            Xi = torch.from_numpy(X[i].astype("float32")).to(DEVICE)
-            yi = torch.from_numpy(y[i].astype("float32")).to(DEVICE)
+            Xi = torch.from_numpy(X[i].astype("float32")).to(self.cfg.DEVICE)
+            yi = torch.from_numpy(y[i].astype("float32")).to(self.cfg.DEVICE)
             if self.temporal_encoding:
                 ti = torch.from_numpy(self.temporal_data[i].astype("float32")).to(
-                    DEVICE
+                    self.cfg.DEVICE
                 )
             else:
                 ti = None
             if self.spatial_encoding:
-                si = torch.from_numpy(self.spatial_data.astype("float32")).to(DEVICE)
+                si = torch.from_numpy(self.spatial_data.astype("float32")).to(
+                    self.cfg.DEVICE
+                )
             else:
                 si = None
             g = data.Data(
@@ -215,21 +219,21 @@ class NNDataProcessor:
                 pos=si,
                 time=ti,
             )
-            g = g.to(DEVICE)
+            g = g.to(self.cfg.DEVICE)
             dataset.append(g)
 
         train_dataset = dataset[: self.train_size]
         val_dataset = dataset[self.train_size : self.train_size + self.val_size]
         test_dataset = dataset[-self.test_size :]
         # random state for reproduction
-        train_dataset = shuffle(train_dataset, random_state=RANDOM_STATE)
-        val_dataset = shuffle(val_dataset, random_state=RANDOM_STATE)
-        test_dataset = shuffle(test_dataset, random_state=RANDOM_STATE)
+        train_dataset = shuffle(train_dataset, random_state=self.cfg.RANDOM_STATE)
+        val_dataset = shuffle(val_dataset, random_state=self.cfg.RANDOM_STATE)
+        test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
 
         if subset is not None:
-            train_dataset = train_dataset[: subset * BATCH_SIZE]
-            val_dataset = val_dataset[: subset * BATCH_SIZE]
-            test_dataset = test_dataset[: subset * BATCH_SIZE]
+            train_dataset = train_dataset[: subset * self.cfg.BATCH_SIZE]
+            val_dataset = val_dataset[: subset * self.cfg.BATCH_SIZE]
+            test_dataset = test_dataset[: subset * self.cfg.BATCH_SIZE]
 
         # if subset is None:
         #     train_sampler, test_sampler = None, None
@@ -237,9 +241,9 @@ class NNDataProcessor:
         #     train_sampler = RandomSampler(train_dataset, num_samples=subset)
         #     test_sampler = RandomSampler(test_dataset, num_samples=subset)
 
-        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
-        val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
-        test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
+        train_loader = DataLoader(train_dataset, batch_size=self.cfg.BATCH_SIZE)
+        val_loader = DataLoader(val_dataset, batch_size=self.cfg.BATCH_SIZE)
+        test_loader = DataLoader(test_dataset, batch_size=self.cfg.BATCH_SIZE)
         return train_loader, val_loader, test_loader
 
     def get_shapes(self):
@@ -257,16 +261,16 @@ class NNDataProcessor:
         Maps latitude-longitude span e.g. (32,48) -> (25,45)
         """
         if flat:
-            batch_size = int(
+            self.cfg.BATCH_SIZE = int(
                 input_tensor.shape[0] / self.num_latitudes / self.num_longitudes
             )
             input_tensor = input_tensor.reshape(
                 (
-                    batch_size,
+                    self.cfg.BATCH_SIZE,
                     self.num_latitudes,
                     self.num_longitudes,
                     self.num_features,
-                    1,
+                    input_tensor.shape[-1],
                 )
             )
 

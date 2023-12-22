@@ -11,9 +11,9 @@ import sys
 
 sys.path.append("..")
 
-from baselines.data_processor import DataProcessor
-from baselines.linear_reg.linear_regressor import LinearRegressor
-from baselines.linear_reg.simple_linear_regressor import SimpleLinearRegressor
+from models.data_processor import DataProcessor
+from models.linear_reg.linear_regressor import LinearRegressor
+from models.linear_reg.simple_linear_regressor import SimpleLinearRegressor
 
 
 class InvalidBaselineException(Exception):

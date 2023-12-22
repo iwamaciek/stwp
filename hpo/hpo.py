@@ -14,10 +14,10 @@ sys.path.append("..")
 
 import json
 
-from baselines.data_processor import DataProcessor
-from baselines.linear_reg.linear_regressor import LinearRegressor
-from baselines.linear_reg.simple_linear_regressor import SimpleLinearRegressor
-from baselines.grad_boost.grad_booster import GradBooster
+from models.data_processor import DataProcessor
+from models.linear_reg.linear_regressor import LinearRegressor
+from models.linear_reg.simple_linear_regressor import SimpleLinearRegressor
+from models.grad_boost.grad_booster import GradBooster
 
 
 class InvalidBaselineException(Exception):

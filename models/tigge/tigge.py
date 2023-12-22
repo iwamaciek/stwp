@@ -5,19 +5,20 @@ import matplotlib.pyplot as plt
 import sys
 
 
-sys.path.append('../..')
-from baselines.baseline_regressor import  BaselineRegressor
-from baselines.data_processor import DataProcessor
+sys.path.append("../..")
+from models.baseline_regressor import BaselineRegressor
+from models.data_processor import DataProcessor
 
 
+grib_file = "../../2022-01-01-to-2022-12-31.grib"
 
-grib_file = '../../2022-01-01-to-2022-12-31.grib'
 
 def step_split(feature, n_steps=3):
     step_split = np.split(feature, n_steps, axis=1)
     step_split = [np.squeeze(arr, axis=1) for arr in step_split]
 
     return np.array(step_split)
+
 
 def load_tigge_0_to_12_by_6(grib_file):
     grib_data = cfgrib.open_datasets(grib_file)
@@ -40,15 +41,31 @@ def load_tigge_0_to_12_by_6(grib_file):
     tp_tigge = grib_data[3].tp.to_numpy()
     tp_step_0, tp_step_6, tp_step_12 = step_split(tp_tigge) / 1000
 
-    data_step_0 = np.stack((t2m_step_0, sp_step_0, tcc_step_0, u10_step_0, v10_step_0, tp_step_0), axis=-1)
-    data_step_6 = np.stack((t2m_step_6, sp_step_6, tcc_step_6, u10_step_6, v10_step_6, tp_step_6), axis=-1)
-    data_step_12 = np.stack((t2m_step_12, sp_step_12, tcc_step_12, u10_step_12, v10_step_12, tp_step_12, sp_step_12), axis=-1)
+    data_step_0 = np.stack(
+        (t2m_step_0, sp_step_0, tcc_step_0, u10_step_0, v10_step_0, tp_step_0), axis=-1
+    )
+    data_step_6 = np.stack(
+        (t2m_step_6, sp_step_6, tcc_step_6, u10_step_6, v10_step_6, tp_step_6), axis=-1
+    )
+    data_step_12 = np.stack(
+        (
+            t2m_step_12,
+            sp_step_12,
+            tcc_step_12,
+            u10_step_12,
+            v10_step_12,
+            tp_step_12,
+            sp_step_12,
+        ),
+        axis=-1,
+    )
 
     return data_step_0, data_step_6, data_step_12
 
+
 def evaluate_and_compare(data1, data2, max_samples=1):
 
-    feature_list = ['t2m', 'sp', 'tcc', 'u10', 'v10', 'tp']
+    feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
     s = 3
     fh = 1
     print(type(data1))
@@ -60,14 +77,9 @@ def evaluate_and_compare(data1, data2, max_samples=1):
 
     X_2, y_2 = data2_processor.preprocess(s, fh)
 
-
     data1_regressor = BaselineRegressor(X_1.shape, fh, feature_list)
     data1_regressor.plot_predictions(X_1, X_2, max_samples=max_samples)
 
     eval_scores = data1_regressor.evaluate(X_1, X_2)
     for i in range(len(feature_list)):
-            print(
-                f"{feature_list[i]} => RMSE: {eval_scores[i]}"
-            )
-
-
+        print(f"{feature_list[i]} => RMSE: {eval_scores[i]}")

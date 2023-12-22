@@ -4,7 +4,7 @@ from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
 from sklearn.ensemble import AdaBoostRegressor
 from lightgbm import LGBMRegressor
-from baselines.baseline_regressor import BaselineRegressor
+from models.baseline_regressor import BaselineRegressor
 
 
 class GradBooster(BaselineRegressor):

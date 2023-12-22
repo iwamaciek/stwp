@@ -1,18 +1,27 @@
-from baselines.config import (
+from models.config import (
     FH,
     INPUT_SIZE,
     BATCH_SIZE,
 )
 
-# from baselines.gnn.processor import NNDataProcessor
+# from models.gnn.processor import NNDataProcessor
 
 # sys.path.append("..")
-from baselines.gnn.processor import NNDataProcessor
+from models.gnn.processor import NNDataProcessor
 
 
 class CNNDataProcessor(NNDataProcessor):
-    def __init__(self, spatial_encoding=False, temporal_encoding=False, additional_encodings=False) -> None:
-        super().__init__(spatial_encoding=spatial_encoding, temporal_encoding=temporal_encoding, additional_encodings=additional_encodings)
+    def __init__(
+        self,
+        spatial_encoding=False,
+        temporal_encoding=False,
+        additional_encodings=False,
+    ) -> None:
+        super().__init__(
+            spatial_encoding=spatial_encoding,
+            temporal_encoding=temporal_encoding,
+            additional_encodings=additional_encodings,
+        )
 
     def preprocess(self, subset=None):
         X_train, X_test, y_train, y_test = self.train_val_test_split()

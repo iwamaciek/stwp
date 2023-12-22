@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 from statsmodels.tsa.api import SimpleExpSmoothing, Holt
-from baselines.baseline_regressor import BaselineRegressor
+from models.baseline_regressor import BaselineRegressor
 
 
 class SmoothingPredictor(BaselineRegressor):
@@ -25,16 +25,16 @@ class SmoothingPredictor(BaselineRegressor):
 
     def train(self, X_train, y_train, normalized=False):
         print("Not needed")
-        raise KeyError
+        return
 
     def predict_(self, X_test, y_test):
         X = X_test.reshape(
-            -1, self.latitude, self.longitude, self.input_state, self.features
+            -1, self.latitude, self.longitude, self.input_state, self.num_features
         )
         y_hat = []
         for i in range(X.shape[0]):
             y_hat_i = []
-            for j in range(self.features):
+            for j in range(self.num_features):
                 ylat = []
                 for lat in range(X.shape[1]):
                     ylon = []
@@ -74,7 +74,7 @@ class SmoothingPredictor(BaselineRegressor):
         y_hat = (
             np.array(y_hat)
             .reshape(
-                (X.shape[0], self.features, self.latitude, self.longitude, self.fh)
+                (X.shape[0], self.num_features, self.latitude, self.longitude, self.fh)
             )
             .transpose((0, 2, 3, 4, 1))
         )

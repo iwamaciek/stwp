@@ -1,6 +1,6 @@
 from torch import nn, cat
 from torch.nn.functional import relu
-from baselines.config import BATCH_SIZE, INPUT_DIMS
+from models.config import BATCH_SIZE, INPUT_DIMS
 
 
 class UNet(nn.Module):

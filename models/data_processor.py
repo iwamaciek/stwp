@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import cfgrib
 import numpy as np
+import copy
 from datetime import datetime
 from utils.datetime_operations import datetime64_to_datetime, get_day_of_year
 from utils.trig_encode import trig_encode
 from sklearn.utils import shuffle
-from baselines.config import DATA_PATH, TRAIN_RATIO, INPUT_SIZE, FH, R, RANDOM_STATE
+from models.config import config as cfg
 from utils.get_data import BIG_AREA, SMALL_AREA
 
 
@@ -28,50 +29,51 @@ class DataProcessor:
             spatial_encoding=self.spatial_encoding,
             temporal_encoding=self.temporal_encoding,
         )
+        self.raw_data = copy.deepcopy(self.data)
         self.samples, self.latitude, self.longitude, self.num_features = self.data.shape
-        self.neighbours, self.input_size = None, None
+        self.neighbours, self.sequence_length = None, None
 
     def upload_data(self, data: np.array):
         self.data = data
 
-    def create_autoregressive_sequences(self, sequence_length=INPUT_SIZE + FH):
-        self.input_size = sequence_length
+    def create_autoregressive_sequences(self, input_size=cfg.INPUT_SIZE, fh=cfg.FH):
+        self.sequence_length = input_size + fh
         sequences = np.empty(
             (
-                self.samples - self.input_size + 1,
-                self.input_size,
+                self.samples - self.sequence_length + 1,
+                self.sequence_length,
                 self.latitude,
                 self.longitude,
                 self.num_features,
             )
         )
-        for i in range(self.samples - sequence_length + 1):
-            sequences[i] = self.data[i : i + sequence_length]
+        for i in range(self.samples - self.sequence_length + 1):
+            sequences[i] = self.raw_data[i : i + self.sequence_length]
         sequences = sequences.transpose((0, 2, 3, 1, 4))
         self.samples = sequences.shape[0]
         self.data = sequences
         if self.temporal_encoding:
             time_sequences = np.empty(
                 (
-                    self.samples - self.input_size + 1,
+                    self.samples - self.sequence_length + 1,
                     self.num_temporal_constants,
                 )
             )
-            for i in range(self.samples - sequence_length + 1):
+            for i in range(self.samples - self.sequence_length + 1):
                 time_sequences[i] = self.temporal_data[
-                    i + INPUT_SIZE
+                    i + input_size
                 ]  # Get time for the last timestamp for x
             self.temporal_data = time_sequences
         if self.spatial_encoding:
             spatial_sequences = np.empty(
                 (
-                    self.samples - self.input_size + 1,
+                    self.samples - self.sequence_length + 1,
                     self.latitude * self.longitude,
                     self.num_spatial_constants,
                 )
             )
-            for i in range(self.samples - sequence_length + 1):
-                spatial_sequences[i] = self.spatial_data
+            for i in range(self.samples - self.sequence_length + 1):
+                spatial_sequences[i] = self.spatial_data[0]
             self.spatial_data = spatial_sequences
 
     def create_neighbours(self, radius):
@@ -82,7 +84,7 @@ class DataProcessor:
                 self.latitude,
                 self.longitude,
                 self.neighbours + 1,
-                self.input_size,
+                self.sequence_length,
                 self.num_features
                 + self.num_spatial_constants
                 + self.num_temporal_constants,
@@ -102,8 +104,10 @@ class DataProcessor:
 
         self.data = neigh_data
 
-    def preprocess(self, input_size=INPUT_SIZE, fh=FH, r=R, use_neighbours=False):
-        self.create_autoregressive_sequences(sequence_length=input_size + fh)
+    def preprocess(
+        self, input_size=cfg.INPUT_SIZE, fh=cfg.FH, r=cfg.R, use_neighbours=False
+    ):
+        self.create_autoregressive_sequences(input_size, fh)
         if use_neighbours:
             self.create_neighbours(radius=r)
             y = self.data[..., 0, -fh:, : self.num_features]
@@ -113,7 +117,7 @@ class DataProcessor:
         return X, y
 
     def load_data(
-        self, path=DATA_PATH, spatial_encoding=False, temporal_encoding=False
+        self, path=cfg.DATA_PATH, spatial_encoding=False, temporal_encoding=False
     ):
         grib_data = cfgrib.open_datasets(path)
         surface = grib_data[0]
@@ -185,11 +189,11 @@ class DataProcessor:
         return data, feature_list, temporal_data, spatial_data
 
     @staticmethod
-    def train_test_split(X, y, split_ratio=TRAIN_RATIO):
+    def train_test_split(X, y, split_ratio=cfg.TRAIN_RATIO):
         return DataProcessor.train_val_test_split(X, y, split_ratio)
 
     @staticmethod
-    def train_val_test_split(X, y, split_ratio=TRAIN_RATIO, split_type=1):
+    def train_val_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=1):
         """
         split_type=0: X_train (2020), X_val (2021), X_test (2022)
         split_type=1: X_train (2020), X_test (2021)
@@ -210,9 +214,9 @@ class DataProcessor:
                 y[train_samples : 2 * train_samples],
                 y[2 * train_samples :],
             )
-            X_train, y_train = shuffle(X_train, y_train, random_state=RANDOM_STATE)
-            X_val, y_val = shuffle(X_val, y_val, random_state=RANDOM_STATE)
-            X_test, y_test = shuffle(X_test, y_test, random_state=RANDOM_STATE)
+            X_train, y_train = shuffle(X_train, y_train, random_state=cfg.RANDOM_STATE)
+            X_val, y_val = shuffle(X_val, y_val, random_state=cfg.RANDOM_STATE)
+            X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
 
             return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -228,8 +232,8 @@ class DataProcessor:
             X_train, X_test = X[:train_samples], X[train_samples:]
             y_train, y_test = y[:train_samples], y[train_samples:]
 
-        X_train, y_train = shuffle(X_train, y_train, random_state=RANDOM_STATE)
-        X_test, y_test = shuffle(X_test, y_test, random_state=RANDOM_STATE)
+        X_train, y_train = shuffle(X_train, y_train, random_state=cfg.RANDOM_STATE)
+        X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
 
         return X_train, X_test, y_train, y_test
 
@@ -252,7 +256,7 @@ class DataProcessor:
     @staticmethod
     def get_spatial_info():
         res = 0.25
-        north, west, south, east = SMALL_AREA
+        north, west, south, east = BIG_AREA
         spatial_limits = [west, east, south, north]
         we_span_1d = np.arange(west, east + res, res)
         ns_span_1d = np.arange(north, south - res, -res)

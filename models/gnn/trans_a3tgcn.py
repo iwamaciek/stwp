@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn.conv import TransformerConv
 from torch_geometric_temporal.nn.recurrent import A3TGCN
-from baselines.config import INPUT_SIZE, FH
-from baselines.gnn.st_encoder_module import SpatioTemporalEncoder
+from models.config import INPUT_SIZE, FH
+from models.gnn.st_encoder_module import SpatioTemporalEncoder
 
 N = 5
 

@@ -5,38 +5,76 @@ import time
 import cartopy.crs as ccrs
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from baselines.gnn.processor import NNDataProcessor
-from baselines.data_processor import DataProcessor
-from baselines.config import DEVICE, FH, BATCH_SIZE
-from baselines.gnn.callbacks import (
+from models.gnn.processor import NNDataProcessor
+from models.data_processor import DataProcessor
+from models.config import config as cfg
+from models.gnn.callbacks import (
     LRAdjustCallback,
     CkptCallback,
     EarlyStoppingCallback,
 )
-from baselines.gnn.cgc_conv import CrystalGNN
-from baselines.gnn.transformer_conv import TransformerGNN
-from baselines.gnn.gat_conv import GATConvNN
-from baselines.gnn.gen_conv import GENConvNN
-from baselines.gnn.pdn_conv import PDNConvNN
+from models.gnn.cgc_conv import CrystalGNN
+from models.gnn.transformer_conv import TransformerGNN
+from models.gnn.gat_conv import GATConvNN
+from models.gnn.gen_conv import GENConvNN
+from models.gnn.pdn_conv import PDNConvNN
 from utils.draw_functions import draw_poland
 
 
 class Trainer:
     def __init__(
         self,
-        architecture="cgcn",
-        hidden_dim=64,
-        lr=0.01,
+        architecture="trans",
+        hidden_dim=32,
+        lr=1e-3,
         gamma=0.5,
         subset=None,
         spatial_mapping=True,
         additional_encodings=True,
     ):
+        self.nn_proc = None
+        self.train_loader = None
+        self.val_loader = None
+        self.test_loader = None
+        self.feature_list = None
+        self.features = None
+        self.constants = None
+        self.edge_index = None
+        self.edge_weights = None
+        self.edge_attr = None
+        self.scalers = None
+        self.train_size = None
+        self.val_size = None
+        self.test_size = None
+        self.spatial_mapping = spatial_mapping
+        self.subset = subset
 
-        # Full data preprocessing for nn input run in NNDataProcessor constructor
-        # If subset param is given train_data and test_data will have len=subset
+        self.cfg = cfg
         self.nn_proc = NNDataProcessor(additional_encodings=additional_encodings)
-        self.nn_proc.preprocess(subset=subset)
+        self.init_data_process()
+
+        self.model = None
+        self.architecture = architecture
+        self.hidden_dim = hidden_dim
+        self.init_architecture()
+
+        self.criterion = None
+        self.lr = None
+        self.gamma = None
+        self.optimizer = None
+        self.lr_callback = None
+        self.ckpt_callback = None
+        self.early_stop_callback = None
+
+        self.init_train_details(lr, gamma)
+
+    def update_config(self, c):
+        self.cfg = c
+        self.init_architecture()
+        self.update_data_process()
+
+    def init_data_process(self):
+        self.nn_proc.preprocess(subset=self.subset)
         self.train_loader = self.nn_proc.train_loader
         self.val_loader = self.nn_proc.val_loader
         self.test_loader = self.nn_proc.test_loader
@@ -53,54 +91,45 @@ class Trainer:
         self.train_size = len(self.train_loader)
         self.val_size = len(self.val_loader)
         self.test_size = len(self.test_loader)
-        self.spatial_mapping = spatial_mapping
-        if subset is None:
+        self.spatial_mapping = self.spatial_mapping
+        if self.subset is None:
             self.subset = self.train_size
-        else:
-            self.subset = subset
 
-        # Architecture details
+    def update_data_process(self):
+        self.nn_proc.update(self.cfg)
+        self.init_data_process()
+
+    def init_architecture(self):
         init_dict = {
             "input_features": self.features,
             "output_features": self.features,
             "edge_dim": self.edge_attr.size(-1),
-            "hidden_dim": hidden_dim,
+            "hidden_dim": self.hidden_dim,
             "input_t_dim": self.nn_proc.num_temporal_constants,
             "input_s_dim": self.nn_proc.num_spatial_constants,
+            "input_size": self.cfg.INPUT_SIZE,
+            "fh": self.cfg.FH,
         }
 
-        if architecture == "cgcn":
-            self.model = CrystalGNN(**init_dict).to(DEVICE)
-        elif architecture == "trans":
-            self.model = TransformerGNN(**init_dict).to(DEVICE)
-        elif architecture == "gat":
-            self.model = GATConvNN(**init_dict).to(DEVICE)
-        elif architecture == "gen":
-            self.model = GENConvNN(**init_dict).to(DEVICE)
-        elif architecture == "pdn":
-            self.model = PDNConvNN(**init_dict).to(DEVICE)
+        if self.architecture == "cgcn":
+            self.model = CrystalGNN(**init_dict).to(self.cfg.DEVICE)
+        elif self.architecture == "trans":
+            self.model = TransformerGNN(**init_dict).to(self.cfg.DEVICE)
+        elif self.architecture == "gat":
+            self.model = GATConvNN(**init_dict).to(self.cfg.DEVICE)
+        elif self.architecture == "gen":
+            self.model = GENConvNN(**init_dict).to(self.cfg.DEVICE)
+        elif self.architecture == "pdn":
+            self.model = PDNConvNN(**init_dict).to(self.cfg.DEVICE)
         else:
             # TODO handling
             self.model = None
 
-        # Does not improve performance
-        # feature_means = torch.zeros(self.features).to(DEVICE)
-        # for b in self.train_loader:
-        #     feature_means += b.y.mean(dim=0).squeeze()
-        # self.model.initialize_last_layer_bias(feature_means / len(self.train_loader))
-
-        # Training details
-        self.criterion = (
-            torch.nn.L1Loss()
-        )  # lambda output, target: (output - target).pow(2).sum()
+    def init_train_details(self, lr, gamma):
+        self.criterion = torch.nn.L1Loss()
         self.lr = lr
         self.gamma = gamma
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-        # self.optimizer = torch.optim.AdamW(
-        #     self.model.parameters(), betas=(0.9, 0.95), weight_decay=0.1, lr=self.lr
-        # )
-
-        # Callbacks
         self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
         self.early_stop_callback = EarlyStoppingCallback()
@@ -119,7 +148,7 @@ class Trainer:
             self.model.train()
             total_loss = 0
             for batch in self.train_loader:
-                batch = batch.to(DEVICE)
+                batch = batch.to(self.cfg.DEVICE)
                 y_hat = self.model(
                     batch.x, batch.edge_index, batch.edge_attr, batch.time, batch.pos
                 )
@@ -129,7 +158,7 @@ class Trainer:
                     y_hat = self.nn_proc.map_latitude_longitude_span(y_hat)
                     batch_y = self.nn_proc.map_latitude_longitude_span(batch.y)
 
-                loss = self.criterion(y_hat, batch_y)  # / BATCH_SIZE
+                loss = self.criterion(y_hat, batch_y)
                 loss.backward()
 
                 # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
@@ -151,7 +180,7 @@ class Trainer:
             with torch.no_grad():
                 val_loss = 0
                 for batch in self.val_loader:
-                    batch = batch.to(DEVICE)
+                    batch = batch.to(self.cfg.DEVICE)
                     y_hat = self.model(
                         batch.x,
                         batch.edge_index,
@@ -165,7 +194,7 @@ class Trainer:
                         y_hat = self.nn_proc.map_latitude_longitude_span(y_hat)
                         batch_y = self.nn_proc.map_latitude_longitude_span(batch.y)
 
-                    loss = self.criterion(y_hat, batch_y)  # / BATCH_SIZE
+                    loss = self.criterion(y_hat, batch_y)
                     val_loss += loss.item()
 
             avg_val_loss = val_loss / min(self.subset, self.val_size)
@@ -194,14 +223,16 @@ class Trainer:
         plt.show()
 
     def inverse_normalization_predict(self, X, y, edge_index, edge_attr, s, t):
-        y = y.reshape((-1, self.latitude, self.longitude, self.features, FH))
+        y = y.reshape((-1, self.latitude, self.longitude, self.features, self.cfg.FH))
         y = y.cpu().detach().numpy()
 
         y_hat = self.model(X, edge_index, edge_attr, t, s)
-        y_hat = y_hat.reshape((-1, self.latitude, self.longitude, self.features, FH))
+        y_hat = y_hat.reshape(
+            (-1, self.latitude, self.longitude, self.features, self.cfg.FH)
+        )
         y_hat = y_hat.cpu().detach().numpy()
 
-        yshape = (self.latitude, self.longitude, FH)
+        yshape = (self.latitude, self.longitude, self.cfg.FH)
 
         for i in range(self.features):
             for j in range(y_hat.shape[0]):
@@ -245,21 +276,23 @@ class Trainer:
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
             latitude, longitude = y_hat.shape[1:3]
 
-        for i in range(BATCH_SIZE):
+        for i in range(self.cfg.BATCH_SIZE):
             if pretty:
                 fig, axs = plt.subplots(
                     self.features,
-                    3 * FH,
-                    figsize=(10 * FH, 3 * self.features),
+                    3 * self.cfg.FH,
+                    figsize=(10 * self.cfg.FH, 3 * self.features),
                     subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
                 )
             else:
                 fig, ax = plt.subplots(
-                    self.features, 3 * FH, figsize=(10 * FH, 3 * self.features)
+                    self.features,
+                    3 * self.cfg.FH,
+                    figsize=(10 * self.cfg.FH, 3 * self.features),
                 )
 
             for j, feature_name in enumerate(self.feature_list):
-                for k in range(3 * FH):
+                for k in range(3 * self.cfg.FH):
                     ts = k // 3
                     if pretty:
                         ax = axs[j, k]
@@ -286,7 +319,7 @@ class Trainer:
                         ax[j, k].axis("off")
                         _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
-        self.calculate_matrics(y_hat, y)
+        self.calculate_metrics(y_hat, y)
 
     def evaluate(self, data_type="test"):
         if data_type == "train":
@@ -299,8 +332,8 @@ class Trainer:
             print("Invalid type: (train, test, val)")
             raise ValueError
 
-        y = np.empty((0, self.latitude, self.longitude, self.features, FH))
-        y_hat = np.empty((0, self.latitude, self.longitude, self.features, FH))
+        y = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
+        y_hat = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         for batch in loader:
             y_i, y_hat_i = self.inverse_normalization_predict(
                 batch.x,
@@ -316,9 +349,9 @@ class Trainer:
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
-        self.calculate_matrics(y_hat, y)
+        self.calculate_metrics(y_hat, y)
 
-    def calculate_matrics(self, y_hat, y):
+    def calculate_metrics(self, y_hat, y):
         for i, feature_name in enumerate(self.feature_list):
             y_fi = y[..., i, :].reshape(-1, 1)
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)

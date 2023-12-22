@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from torch_geometric.nn.conv import GENConv
-from baselines.config import INPUT_SIZE, FH
-from baselines.gnn.st_encoder_module import SpatioTemporalEncoder
+from models.config import config as cfg
+from models.gnn.st_encoder_module import SpatioTemporalEncoder
 
 N = 5
 
@@ -16,9 +16,11 @@ class GENConvNN(torch.nn.Module):
         hidden_dim,
         input_t_dim=4,
         input_s_dim=6,
+        input_size=cfg.INPUT_SIZE,
+        fh=cfg.FH,
     ):
         super(GENConvNN, self).__init__()
-        self.mlp_embedder = nn.Linear(input_features * INPUT_SIZE, hidden_dim)
+        self.mlp_embedder = nn.Linear(input_features * input_size, hidden_dim)
         self.st_encoder = SpatioTemporalEncoder(
             hidden_dim, input_t_dim, input_s_dim, hidden_dim
         )
@@ -29,7 +31,8 @@ class GENConvNN(torch.nn.Module):
             edge_dim=edge_dim,
             num_layers=N,
         )
-        self.mlp_decoder = nn.Linear(hidden_dim, output_features * FH)
+        self.mlp_decoder = nn.Linear(hidden_dim, output_features * fh)
+        self.fh = fh
 
     def forward(self, x, edge_index, edge_attr, t, s):
         x = x.view(-1, x.size(-2) * x.size(-1))
@@ -38,4 +41,4 @@ class GENConvNN(torch.nn.Module):
         x = self.layer_norm_embed(x).relu()
         x = self.gengnn(x, edge_index, edge_attr).relu()
         x = self.mlp_decoder(x)
-        return x.view(x.size(0), x.size(1) // FH, FH)
+        return x.view(x.size(0), x.size(1) // self.fh, self.fh)

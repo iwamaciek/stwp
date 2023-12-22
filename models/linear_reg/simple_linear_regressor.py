@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import copy
 import numpy as np
-from baselines.data_processor import DataProcessor
-from baselines.baseline_regressor import BaselineRegressor
+from models.data_processor import DataProcessor
+from models.baseline_regressor import BaselineRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 
 

@@ -235,12 +235,6 @@ class NNDataProcessor:
             val_dataset = val_dataset[: subset * self.cfg.BATCH_SIZE]
             test_dataset = test_dataset[: subset * self.cfg.BATCH_SIZE]
 
-        # if subset is None:
-        #     train_sampler, test_sampler = None, None
-        # else:
-        #     train_sampler = RandomSampler(train_dataset, num_samples=subset)
-        #     test_sampler = RandomSampler(test_dataset, num_samples=subset)
-
         train_loader = DataLoader(train_dataset, batch_size=self.cfg.BATCH_SIZE)
         val_loader = DataLoader(val_dataset, batch_size=self.cfg.BATCH_SIZE)
         test_loader = DataLoader(test_dataset, batch_size=self.cfg.BATCH_SIZE)

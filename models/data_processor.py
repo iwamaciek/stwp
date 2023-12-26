@@ -127,7 +127,7 @@ class DataProcessor:
         tcc = surface.tcc.to_numpy()
         u10 = surface.u10.to_numpy()
         v10 = surface.v10.to_numpy()
-        tp = hybrid.tp.to_numpy()
+        tp = hybrid.tp.to_numpy() * 1000
         if tp.ndim >= 4:
             tp = tp.reshape((-1,) + hybrid.tp.shape[2:])
         data = np.stack((t2m, sp, tcc, u10, v10, tp), axis=-1)
@@ -189,8 +189,8 @@ class DataProcessor:
         return data, feature_list, temporal_data, spatial_data
 
     @staticmethod
-    def train_test_split(X, y, split_ratio=cfg.TRAIN_RATIO):
-        return DataProcessor.train_val_test_split(X, y, split_ratio)
+    def train_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=2):
+        return DataProcessor.train_val_test_split(X, y, split_ratio, split_type)
 
     @staticmethod
     def train_val_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=1):
@@ -256,7 +256,7 @@ class DataProcessor:
     @staticmethod
     def get_spatial_info():
         res = 0.25
-        north, west, south, east = BIG_AREA
+        north, west, south, east = SMALL_AREA
         spatial_limits = [west, east, south, north]
         we_span_1d = np.arange(west, east + res, res)
         ns_span_1d = np.arange(north, south - res, -res)

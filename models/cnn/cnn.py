@@ -1,6 +1,6 @@
 from torch import nn, cat
 from torch.nn.functional import relu
-from models.config import BATCH_SIZE, INPUT_DIMS
+from models.config import config as cfg
 
 
 class UNet(nn.Module):
@@ -16,7 +16,7 @@ class UNet(nn.Module):
     ):
         super().__init__()
         BASE = base_units
-        self.lat, self.lon = INPUT_DIMS
+        self.lat, self.lon = cfg.INPUT_DIMS
         self.features = features
         self.mlp_embedder = nn.Linear(s * features, BASE)
         self.temporal_embedder = nn.Linear(temporal_features, self.lat * self.lon)

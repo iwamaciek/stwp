@@ -66,12 +66,17 @@ class Trainer:
         self.ckpt_callback = None
         self.early_stop_callback = None
 
-        self.init_train_details(lr, gamma)
+        self.lr = lr
+        self.gamma = gamma
+        self.criterion = torch.nn.L1Loss()
+        self.early_stop_callback = EarlyStoppingCallback()
+        self.init_train_details()
 
     def update_config(self, c):
         self.cfg = c
         self.init_architecture()
         self.update_data_process()
+        self.init_train_details()
 
     def init_data_process(self):
         self.nn_proc.preprocess(subset=self.subset)
@@ -122,17 +127,14 @@ class Trainer:
         elif self.architecture == "pdn":
             self.model = PDNConvNN(**init_dict).to(self.cfg.DEVICE)
         else:
-            # TODO handling
             self.model = None
+            print(f"Architecture {self.architecture} not implemented")
+            raise NotImplemented
 
-    def init_train_details(self, lr, gamma):
-        self.criterion = torch.nn.L1Loss()
-        self.lr = lr
-        self.gamma = gamma
+    def init_train_details(self):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
-        self.early_stop_callback = EarlyStoppingCallback()
 
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path))
@@ -148,7 +150,8 @@ class Trainer:
             self.model.train()
             total_loss = 0
             for batch in self.train_loader:
-                batch = batch.to(self.cfg.DEVICE)
+                # batch = batch.to(self.cfg.DEVICE)
+                # batch = batch.to(torch.device("cuda"))
                 y_hat = self.model(
                     batch.x, batch.edge_index, batch.edge_attr, batch.time, batch.pos
                 )
@@ -168,7 +171,7 @@ class Trainer:
 
                 total_loss += loss.item()
 
-            avg_loss = total_loss / self.subset
+            avg_loss = total_loss / (self.subset * self.cfg.BATCH_SIZE)
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
 
@@ -180,7 +183,8 @@ class Trainer:
             with torch.no_grad():
                 val_loss = 0
                 for batch in self.val_loader:
-                    batch = batch.to(self.cfg.DEVICE)
+                    # batch = batch.to(self.cfg.DEVICE)
+                    # batch = batch.to(torch.device("cuda"))
                     y_hat = self.model(
                         batch.x,
                         batch.edge_index,
@@ -197,7 +201,9 @@ class Trainer:
                     loss = self.criterion(y_hat, batch_y)
                     val_loss += loss.item()
 
-            avg_val_loss = val_loss / min(self.subset, self.val_size)
+            avg_val_loss = val_loss / (
+                min(self.subset, self.val_size) * self.cfg.BATCH_SIZE
+            )
             val_loss_list.append(avg_val_loss)
 
             print(f"Val Loss: {avg_val_loss:.4f}\n---------")

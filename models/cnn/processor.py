@@ -1,8 +1,4 @@
-from models.config import (
-    FH,
-    INPUT_SIZE,
-    BATCH_SIZE,
-)
+from models.config import config as cfg
 
 # from models.gnn.processor import NNDataProcessor
 
@@ -29,10 +25,14 @@ class CNNDataProcessor(NNDataProcessor):
         X = X.transpose((0, 1, 3, 2))
         y = y.transpose((0, 1, 3, 2))
         X = X.reshape(
-            -1, self.num_latitudes, self.num_longitudes, INPUT_SIZE, self.num_features
+            -1,
+            self.num_latitudes,
+            self.num_longitudes,
+            cfg.INPUT_SIZE,
+            self.num_features,
         )
         y = y.reshape(
-            -1, self.num_latitudes, self.num_longitudes, FH, self.num_features
+            -1, self.num_latitudes, self.num_longitudes, cfg.FH, self.num_features
         )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
             X, y, subset
@@ -47,7 +47,7 @@ class CNNDataProcessor(NNDataProcessor):
         if flat:
             input_tensor = input_tensor.reshape(
                 (
-                    BATCH_SIZE,
+                    cfg.BATCH_SIZE,
                     self.num_features,
                     self.num_latitudes,
                     self.num_longitudes,

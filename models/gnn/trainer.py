@@ -60,6 +60,8 @@ class Trainer:
         self.lr = lr
         self.gamma = gamma
         self.criterion = torch.nn.L1Loss()
+        # self.criterion = torch.mean(torch.log(torch.cosh((y-y_hat) + 1e-12))) # LogCosh
+        # self.criterion = torch.nn.HuberLoss()
         self.optimizer = None
         self.lr_callback = None
         self.ckpt_callback = None

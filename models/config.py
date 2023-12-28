@@ -9,7 +9,7 @@ class Config:
     INPUT_SIZE = 5
     R = 2
     SCALER_TYPE = "standard"
-    DATA_PATH = "../data/data2019-2021.grib"
+    DATA_PATH = "../data/data2021-small.grib"
     RANDOM_STATE = 42
     INPUT_DIMS = (32, 48)
     OUTPUT_DIMS = (25, 45)

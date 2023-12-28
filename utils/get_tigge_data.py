@@ -3,7 +3,7 @@ from ecmwfapi import ECMWFDataServer
 
 server = ECMWFDataServer()
 
-dates = "2023-10-01/to/2023-10-02"
+dates = "2021-01-01/to/2021-12-31"
 
 server.retrieve(
     {
@@ -19,6 +19,6 @@ server.retrieve(
         "time": "00:00:00/12:00:00",
         "area": "55/14/49/25",  # N/W/S/E
         "type": "fc",  # fc=forecast, cf=control forecast,
-        "target": "../" + dates.replace("/", "-") + ".grib",
+        "target": "../" + dates.replace("/", "-") + "_tigge.grib",
     }
 )

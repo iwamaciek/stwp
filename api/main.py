@@ -12,7 +12,10 @@ import matplotlib.pyplot as plt
 
 app = FastAPI()
 
-with open("data.json","r") as file:
+current_dir = os.getcwd()
+print(current_dir)
+
+with open("./api/data.json","r") as file:
     json_data = json.load(file)
 
 lat_min = float(min(json_data.keys()))
@@ -66,9 +69,9 @@ def interpolate_value(array, lat, lng):
 
 def get_values_by_lat_lng(lat, lng):
 
-    lat, lng = str(lat), str(lng)
+    # lat, lng = str(lat), str(lng)
 
-    timestamps = json_data[lat][lng]["t2m"].keys()
+    timestamps = json_data["55.0"]["14.0"]["t2m"].keys()
 
     features = {
         "sp": np.array([[[json_data[lat][lng]["sp"][timestamp] for timestamp in json_data[lat][lng]["sp"]] for lng in json_data[lat]] for lat in json_data]),
@@ -79,7 +82,7 @@ def get_values_by_lat_lng(lat, lng):
         "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
     }
 
-    lat, lng = float(lat), float(lng)
+    # lat, lng = float(lat), float(lng)
 
     response = {"lat": lat, "lng": lng, "timestamps": []}
 
@@ -160,15 +163,16 @@ async def get_weather(
 @app.get("/maps")
 async def get_maps():
     # create_maps()
-    images = os.listdir("maps")  # Get a list of all files in the "maps" folder
+    images = os.listdir("./api/maps")  # Get a list of all files in the "maps" folder
 
     # Create a Zip file
-    with open("maps.zip", "wb") as f_out:
+    with open("./api/maps.zip", "wb") as f_out:
         with zipfile.ZipFile(f_out, mode="w") as archive:
             for image in images:
-                archive.write(os.path.join("maps", image))
-
-    return FileResponse("maps.zip", media_type="application/zip")
+                full_path = os.path.join("./api/maps", image)
+                archive.write(full_path, arcname=os.path.join("maps", image))
+                
+    return FileResponse("./api/maps.zip", media_type="application/zip")
 
 
 # http://127.0.0.1:8000/weather?latitude=49.7128&longitude=21.006
@@ -176,7 +180,7 @@ async def get_maps():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8888)
 
     # pprint(grib_data[0].u10)
     # pprint(grib_data[0].v10)

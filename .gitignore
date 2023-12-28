@@ -1,10 +1,12 @@
-.ipynb_checkpoints
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
 venv
 *.idx
 *.mp4
 *.grib
 test.txt
-__pycache__
+__pycache__/
+**/__pycache__/
 .idea
 emc.py
 *.pt
@@ -14,3 +16,5 @@ emc.py
 gnn_test
 *.txt
 .DS_store
+catboost_info
+data

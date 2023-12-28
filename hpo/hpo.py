@@ -14,10 +14,10 @@ sys.path.append("..")
 
 import json
 
-from baselines.data_processor import DataProcessor
-from baselines.linear_reg.linear_regressor import LinearRegressor
-from baselines.linear_reg.simple_linear_regressor import SimpleLinearRegressor
-from baselines.lgb.lgb_regressor import LightGBMRegressor
+from models.data_processor import DataProcessor
+from models.linear_reg.linear_regressor import LinearRegressor
+from models.linear_reg.simple_linear_regressor import SimpleLinearRegressor
+from models.grad_boost.grad_booster import GradBooster
 
 
 class InvalidBaselineException(Exception):
@@ -84,7 +84,7 @@ class HPO:
 
             processor = DataProcessor(self.data)
             X, y = processor.preprocess(s, self.fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
 
             if self.baseline_type == "simple-linear":
                 linearreg = SimpleLinearRegressor(
@@ -111,7 +111,7 @@ class HPO:
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "lgbm":
-                regressor = LightGBMRegressor(X.shape, self.fh, self.feature_list)
+                regressor = GradBooster(X.shape, self.fh, self.feature_list)
                 regressor.train(X_train, y_train, normalize=True)
                 y_hat = regressor.predict_(X_test, y_test)
                 rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
@@ -138,7 +138,7 @@ class HPO:
             for s in range(1, max_sequence_lenght + 1):
                 processor = DataProcessor(self.data)
                 X, y = processor.preprocess(s, self.fh, self.use_neighbours)
-                X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+                X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
                 if self.baseline_type == "simple-linear":
                     linearreg = SimpleLinearRegressor(
                         X.shape,
@@ -164,8 +164,8 @@ class HPO:
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "lgbm":
-                    regressor = LightGBMRegressor(X.shape, self.fh, self.feature_list)
-                    regressor.train(X_train, y_train, normalize=True)
+                    regressor = GradBooster(X.shape, self.fh, self.feature_list)
+                    regressor.train(X_train, y_train)
                     y_hat = regressor.predict_(X_test, y_test)
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
                     mean_rmse = np.mean(rmse_values)
@@ -257,7 +257,7 @@ class HPO:
         try:
             processor = DataProcessor(self.data)
             X, y = processor.preprocess(self.best_s, self.fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
 
             if self.baseline_type == "simple-linear":
                 alpha = trial.suggest_float("alpha", 0.1, self.max_alpha, log=True)
@@ -304,9 +304,7 @@ class HPO:
                     "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 0.5, log=True),
                     "num_leaves": trial.suggest_int("num_leaves", 25, 50),
                 }
-                regressor = LightGBMRegressor(
-                    X.shape, self.fh, self.feature_list, **params
-                )
+                regressor = GradBooster(X.shape, self.fh, self.feature_list, **params)
                 regressor.train(X_train, y_train, normalize=True)
                 y_hat = regressor.predict_(X_test, y_test)
                 rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
@@ -328,7 +326,7 @@ class HPO:
 
             processor = DataProcessor(self.data)
             X, y = processor.preprocess(self.best_s, fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
+            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
 
             if self.baseline_type == "simple-linear":
                 linearreg = SimpleLinearRegressor(
@@ -347,9 +345,7 @@ class HPO:
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "lgbm":
-                regressor = LightGBMRegressor(
-                    X.shape, fh, self.feature_list, **self.params
-                )
+                regressor = GradBooster(X.shape, fh, self.feature_list, **self.params)
                 regressor.train(X_train, y_train, normalize=True)
                 y_hat = regressor.predict_(X_test, y_test)
                 rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)

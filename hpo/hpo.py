@@ -2,22 +2,25 @@ import xarray as xr
 import cfgrib
 import numpy as np
 import optuna
-import sys
 import matplotlib.pyplot as plt
 from datetime import datetime
-
 from functools import partial
 from sklearn.metrics import mean_squared_error
+
+import json
+import time
 import sys
 
 sys.path.append("..")
-
-import json
 
 from models.data_processor import DataProcessor
 from models.linear_reg.linear_regressor import LinearRegressor
 from models.linear_reg.simple_linear_regressor import SimpleLinearRegressor
 from models.grad_boost.grad_booster import GradBooster
+from models.gnn.trainer import Trainer
+from models.cnn.trainer import CNNTrainer
+
+from models.config import config as cfg
 
 
 class InvalidBaselineException(Exception):
@@ -32,13 +35,13 @@ class HPO:
         n_trials,
         dataset,
         use_neighbours=False,
+        # max_sequence_length = 15,
         sequence_length=1,
         sequence_n_trials=15,
         sequence_alpha=5,
         sequence_regressor="ridge",
         fh_n_trials=15,
         max_alpha=10,
-        engine='optuna'
     ):
         self.baseline_type = baseline_type
         self.n_trials = n_trials
@@ -48,21 +51,26 @@ class HPO:
         self.sequence_alpha = sequence_alpha
         self.sequence_regressor = sequence_regressor
         self.fh_n_trials = fh_n_trials
-        self.data, self.feature_list = DataProcessor.load_data(dataset)
+        self.processor = DataProcessor()
+        self.data, self.feature_list = self.processor.data, self.processor.feature_list
         self.best_s = sequence_length
         self.fh = 1
-        self.best_fh = 10000
-        self.regressors = ['lasso', 'ridge', 'elastic_net']
+        self.best_fh = self.fh
+        self.regressors = ["lasso", "ridge", "elastic_net"]
         self.max_alpha = max_alpha
-        self.verbosity = True
+        self.verbosity = False
         self.params = {}
-        self.engine = engine
 
         self.sequence_plot_x = []
         self.sequence_plot_y = []
 
+        self.sequence_plot_time = []
+
         self.fh_plot_x = []
         self.fh_plot_y = []
+        self.fh_plot_time = []
+
+        self.metrics = []
 
     def run_hpo(self):
         return -1
@@ -82,10 +90,10 @@ class HPO:
         try:
             s = trial.suggest_int("s", 1, max_sequence_length)
 
-            processor = DataProcessor(self.data)
-            X, y = processor.preprocess(s, self.fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
-
+            # processor = DataProcessor(self.data)
+            X, y = self.processor.preprocess(s, self.fh, self.use_neighbours)
+            X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
+            start_time = time.time()
             if self.baseline_type == "simple-linear":
                 linearreg = SimpleLinearRegressor(
                     X.shape,
@@ -118,27 +126,35 @@ class HPO:
                 mean_rmse = np.mean(rmse_values)
             else:
                 raise InvalidBaselineException
+            
+            end_time = time.time()
 
             self.sequence_plot_x.append(s)
             self.sequence_plot_y.append(mean_rmse)
 
+            execution_time = end_time - start_time
+            self.sequence_plot_time.append(execution_time)
+            
+
         except InvalidBaselineException:
             print(
-                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
-            )
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   
 
         return mean_rmse
 
-    def determine_best_s(self, max_sequence_lenght=15):
+    def determine_best_s(self):
         try:
             self.clear_sequence_plot()
             best_s = 0
             max_rmse = np.inf
 
-            for s in range(1, max_sequence_lenght + 1):
-                processor = DataProcessor(self.data)
-                X, y = processor.preprocess(s, self.fh, self.use_neighbours)
-                X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
+            for s in range(1, self.sequence_n_trials + 1):
+                # processor = DataProcessor(self.data)
+                self.processor.upload_data(self.data)
+                X, y = self.processor.preprocess(s, self.fh, self.use_neighbours)
+                X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
+                start_time = time.time()
                 if self.baseline_type == "simple-linear":
                     linearreg = SimpleLinearRegressor(
                         X.shape,
@@ -151,6 +167,7 @@ class HPO:
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
                     mean_rmse = np.mean(rmse_values)
+
                 elif self.baseline_type == "linear":
                     linearreg = LinearRegressor(
                         X.shape,
@@ -165,105 +182,62 @@ class HPO:
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "lgbm":
                     regressor = GradBooster(X.shape, self.fh, self.feature_list)
-                    regressor.train(X_train, y_train)
+                    regressor.train(X_train, y_train, normalize=True)
                     y_hat = regressor.predict_(X_test, y_test)
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
                     mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "gnn":
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    cfg.FH  = self.fh
+                    cfg.INPUT_SIZE = s
+                    trainer.update_config(cfg)
+                    trainer.train(num_epochs=3)
+                    rmse_values, _ = trainer.evaluate("test")
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "cnn":
+                    trainer = Trainer()
+                    cfg.FH  = self.fh
+                    cfg.INPUT_SIZE = s
+                    trainer.update_config(cfg)
+                    trainer.train(3)
+                    rmse_values, _ = trainer.evaluate("test")
+                    mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException
-
-
-
-                if(self.verbosity == True):
-                    print(f"s: {s} => mean_rmse {mean_rmse}")
                 
+                end_time = time.time()
+
                 self.sequence_plot_x.append(s)
                 self.sequence_plot_y.append(mean_rmse)
+
+                execution_time = end_time - start_time
+                self.sequence_plot_time.append(execution_time)
 
                 if mean_rmse < max_rmse:
                     max_rmse = mean_rmse
                     best_s = s
 
             self.best_s = best_s
-            print(f'best_s : {best_s}')
 
         except InvalidBaselineException:
             print(
-                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
-            )
-
-    def determine_best_fh(self):
-        try:
-            max_fh_length = self.best_s + 1
-            self.clear_fh_plot()
-            best_fh= 0
-            max_rmse = np.inf
-
-            for fh in range(1, max_fh_length):
-                processor = DataProcessor(self.data)
-                X, y = processor.preprocess(self.best_s, fh, self.use_neighbours)
-                X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
-                if self.baseline_type == "simple-linear":
-                    linearreg = SimpleLinearRegressor(
-                        X.shape,
-                        fh,
-                        self.feature_list,
-                        **self.params
-                    )
-                    linearreg.train(X_train, y_train, normalize=True)
-                    y_hat = linearreg.predict_(X_test, y_test)
-                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
-                    mean_rmse = np.mean(rmse_values)
-                elif self.baseline_type == "linear":
-                    linearreg = LinearRegressor(
-                        X.shape,
-                        fh,
-                        self.feature_list,
-                        **self.params
-                    )
-                    linearreg.train(X_train, y_train, normalize=True)
-                    y_hat = linearreg.predict_(X_test, y_test)
-                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
-                    mean_rmse = np.mean(rmse_values)
-                elif self.baseline_type == "lgbm":
-                    regressor = LightGBMRegressor(X.shape, fh, self.feature_list, **self.params)
-                    regressor.train(X_train, y_train, normalize=True)
-                    y_hat = regressor.predict_(X_test, y_test)
-                    rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
-                    mean_rmse = np.mean(rmse_values)
-                else:
-                    raise InvalidBaselineException
-                
-
-                if(self.verbosity == True):
-                    print(f"fh: {fh} => mean_rmse {mean_rmse}")
-
-                self.fh_plot_x.append(fh)
-                self.fh_plot_y.append(mean_rmse)
-
-                if mean_rmse < max_rmse:
-                    max_rmse = mean_rmse
-                    best_fh = fh
-
-            self.best_fh = best_fh
-            print(f'best_fh : {best_fh}')
-
-        except InvalidBaselineException:
-            print(
-                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
-            )
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   
 
     def objective(self, trial):
         try:
-            processor = DataProcessor(self.data)
-            X, y = processor.preprocess(self.best_s, self.fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
+            # processor = DataProcessor(self.data)
+            self.processor.upload_data(self.data)
+            X, y = self.processor.preprocess(input_size=self.best_s, fh=self.fh, use_neighbours=self.use_neighbours)
+            X_train, X_val, X_test, y_train, y_val, y_test = self.processor.train_val_test_split(X, y, split_type=0)
 
             if self.baseline_type == "simple-linear":
                 alpha = trial.suggest_float("alpha", 0.1, self.max_alpha, log=True)
                 regressor_type = trial.suggest_categorical(
                     "regressor_type", self.regressors
                 )
+
+                # print(f"alpha: {alpha}")
                 linearreg = SimpleLinearRegressor(
                     X.shape,
                     self.fh,
@@ -272,8 +246,8 @@ class HPO:
                     alpha=alpha,
                 )
                 linearreg.train(X_train, y_train, normalize=True)
-                y_hat = linearreg.predict_(X_test, y_test)
-                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                y_hat = linearreg.predict_(X_val, y_val)
+                rmse_values = linearreg.get_rmse(y_hat, y_val, normalize=True)
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "linear":
                 alpha = trial.suggest_float("alpha", 0.1, self.max_alpha, log=True)
@@ -288,8 +262,8 @@ class HPO:
                     alpha=alpha,
                 )
                 linearreg.train(X_train, y_train, normalize=True)
-                y_hat = linearreg.predict_(X_test, y_test)
-                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                y_hat = linearreg.predict_(X_val, y_val)
+                rmse_values = linearreg.get_rmse(y_hat, y_val, normalize=True)
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "lgbm":
                 params = {
@@ -306,28 +280,30 @@ class HPO:
                 }
                 regressor = GradBooster(X.shape, self.fh, self.feature_list, **params)
                 regressor.train(X_train, y_train, normalize=True)
-                y_hat = regressor.predict_(X_test, y_test)
-                rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+                y_hat = regressor.predict_(X_val, y_val)
+                rmse_values = regressor.get_rmse(y_hat, y_val, normalize=True)
                 mean_rmse = np.mean(rmse_values)
+            elif self.baseline_type == "gnn" or self.baseline_type == "cnn":
+                print("HPO not implemented for neural nets")
             else:
                 raise InvalidBaselineException
 
         except InvalidBaselineException:
             print(
-                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
-            )
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   
 
         return mean_rmse
 
-    def fh_objective(self, trial):
+    def fh_objective(self, trial, max_fh=5):
         try:
-            max_fh = self.best_s + 1
             fh = trial.suggest_int("fh", 1, max_fh)
 
-            processor = DataProcessor(self.data)
-            X, y = processor.preprocess(self.best_s, fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_val_test_split(X, y)
-
+            # processor = DataProcessor(self.data)
+            self.processor.upload_data(self.data)
+            X, y = self.processor.preprocess(self.best_s, fh, self.use_neighbours)
+            X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
+            start_time = time.time()
             if self.baseline_type == "simple-linear":
                 linearreg = SimpleLinearRegressor(
                     X.shape, fh, self.feature_list, **self.params
@@ -353,15 +329,100 @@ class HPO:
             else:
                 raise InvalidBaselineException
 
+            end_time = time.time()
             self.fh_plot_x.append(fh)
             self.fh_plot_y.append(mean_rmse)
+            execution_time = end_time - start_time
+            self.fh_plot_time.append(execution_time)
 
         except InvalidBaselineException:
             print(
-                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
-            )
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   
 
         return mean_rmse
+    
+
+    def determine_best_fh(self):
+        try:
+            self.clear_fh_plot()
+            best_fh = 0
+            max_rmse = np.inf
+
+            for fh in range(1, self.fh_n_trials + 1):
+                # processor = DataProcessor(self.data)
+                self.processor.upload_data(self.data)
+                X, y = self.processor.preprocess(self.best_s,fh, self.use_neighbours)
+                X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
+                start_time = time.time()
+                if self.baseline_type == "simple-linear":
+                    linearreg = SimpleLinearRegressor(
+                        X.shape,
+                        fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    mean_rmse = np.mean(rmse_values)
+
+                elif self.baseline_type == "linear":
+                    linearreg = LinearRegressor(
+                        X.shape,
+                        fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "lgbm":
+                    regressor = GradBooster(X.shape, fh, self.feature_list)
+                    regressor.train(X_train, y_train, normalize=True)
+                    y_hat = regressor.predict_(X_test, y_test)
+                    rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "gnn":
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    cfg.FH  = fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(num_epochs=3)
+                    rmse_values, _ = trainer.evaluate("test")
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "cnn":
+                    trainer = Trainer()
+                    cfg.FH  = fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(3)
+                    rmse_values, _ = trainer.evaluate("test")
+                    mean_rmse = np.mean(rmse_values)
+                else:
+                    raise InvalidBaselineException
+                
+                end_time = time.time()
+
+                self.fh_plot_x.append(fh)
+                self.fh_plot_y.append(mean_rmse)
+
+                execution_time = end_time - start_time
+                self.fh_plot_time.append(execution_time)
+
+                if mean_rmse < max_rmse:
+                    max_rmse = mean_rmse
+                    best_fh = fh
+
+            self.best_fh = best_fh
+
+        except InvalidBaselineException:
+            print(
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   
 
     def run_sequence_study(self):
         self.clear_sequence_plot()
@@ -386,61 +447,20 @@ class HPO:
     def run_fh_study(self):
         self.clear_fh_plot()
         study = optuna.create_study(direction="minimize")
-        study.optimize(self.fh_objective, n_trials=self.fh_n_trials)
+        study.optimize(self.fh_objective, n_trials=self.sequence_n_trials)
         if self.verbosity == False:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         self.best_fh = study.best_params["fh"]
         print("Forcasting horizon study finished.")
 
-    def run_best_params(self):
-        try:
-            processor = DataProcessor(self.data)
-            X, y = processor.preprocess(self.best_s, self.best_fh, self.use_neighbours)
-            X_train, X_test, y_train, y_test = processor.train_test_split(X, y)
-
-            if self.baseline_type == "simple-linear":
-                linearreg = SimpleLinearRegressor(
-                    X.shape, self.best_fh, self.feature_list, **self.params
-                )
-                linearreg.train(X_train, y_train, normalize=False)
-                _ = linearreg.predict_and_evaluate(X_test, y_test, max_samples=1)
-            elif self.baseline_type == "linear":
-                linearreg = LinearRegressor(
-                    X.shape, self.best_fh, self.feature_list, **self.params
-                )
-                linearreg.train(X_train, y_train, normalize=False)
-                _ = linearreg.predict_and_evaluate(X_test, y_test, max_samples=1)
-            elif self.baseline_type == "lgbm":
-                regressor = LightGBMRegressor(
-                    X.shape, self.best_fh, self.feature_list, **self.params
-                )
-                regressor.train(X_train, y_train, normalize=False)
-                _ = regressor.predict_and_evaluate(X_test, y_test, max_samples=1)
-            else:
-                raise InvalidBaselineException
-
-        except InvalidBaselineException:
-            print(
-                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear' and  'lgbm'"
-            )
-
     def run_full_study(self):
-        if(self.engine == 'optuna'):
-            self.run_sequence_study()
-            # self.best_s = 3
-            self.run_study()
-            self.write_params_to_json()
-            self.run_fh_study()
-        elif(self.engine == 'greed'):
-            self.determine_best_s()
-            self.run_study()
-            self.write_params_to_json()
-            self.determine_best_fh()
-        else:
-            print('Incorrect engine')
-            
-
+        self.determine_best_s()
+        # self.best_s = 3
+        self.run_study()
+        self.determine_best_fh()
+        self.collect_metrics()
+        self.write_params_to_json()
 
     def report(self):
         self.plot_sequence()
@@ -448,25 +468,20 @@ class HPO:
         self.print_parameters()
         self.plot_fh()
         print(f"Best fh=> {self.best_fh}")
-        self.run_best_params()
 
     def run_and_report(self):
         self.run_full_study()
         self.report()
 
     def plot_sequence(self):
-        tmp = {self.sequence_plot_x[i] : self.sequence_plot_y[i] for i in range(len(self.sequence_plot_x))}
-        tmp = dict(sorted(tmp.items()))
-        plt.plot(tmp.keys(), tmp.values())
+        plt.scatter(self.sequence_plot_x, self.sequence_plot_y)
         plt.title("Sequence length")
         plt.xlabel("s")
         plt.ylabel("mean_rmse")
         plt.show()
 
     def plot_fh(self):
-        tmp = {self.fh_plot_x[i] : self.fh_plot_y[i] for i in range(len(self.fh_plot_x))}
-        tmp = dict(sorted(tmp.items()))
-        plt.plot(tmp.keys(), tmp.values())
+        plt.scatter(self.sequence_plot_x, self.sequence_plot_y)
         plt.title("Forcasting horizon")
         plt.xlabel("fh")
         plt.ylabel("mean_rmse")
@@ -482,3 +497,95 @@ class HPO:
         file_name = self.baseline_type + "-params.json"
         with open(file_name, "w") as outfile:
             json.dump(self.params, outfile)
+
+
+    def collect_metrics(self):
+        try:
+            self.processor.upload_data(self.data)
+            X, y = self.processor.preprocess(input_size=self.best_s, fh=self.best_fh, use_neighbours=self.use_neighbours)
+            X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y, split_type=2)
+            if self.baseline_type == "simple-linear":
+                linearreg = SimpleLinearRegressor(
+                    X.shape,
+                    self.best_fh,
+                    self.feature_list,
+                    **self.params
+                )
+                linearreg.train(X_train, y_train, normalize=True)
+                y_hat = linearreg.predict_(X_test, y_test)
+                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+            elif self.baseline_type == "linear":
+                linearreg = LinearRegressor(
+                    X.shape,
+                    self.fh,
+                    self.feature_list,
+                    **self.params
+                )
+                linearreg.train(X_train, y_train, normalize=True)
+                y_hat = linearreg.predict_(X_test, y_test)
+                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+            elif self.baseline_type == "lgbm":
+                regressor = GradBooster(X.shape, self.best_fh, self.feature_list, **self.params)
+                regressor.train(X_train, y_train, normalize=True)
+                y_hat = regressor.predict_(X_test, y_test)
+                rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+            elif self.baseline_type == "gnn":
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    cfg.FH  = self.fh
+                    cfg.INPUT_SIZE = s
+                    trainer.update_config(cfg)
+                    trainer.train(num_epochs=3)
+                    rmse_values, _ = trainer.evaluate("test")
+            elif self.baseline_type == "cnn":
+                    trainer = Trainer()
+                    cfg.FH  = self.fh
+                    cfg.INPUT_SIZE = s
+                    trainer.update_config(cfg)
+                    trainer.train(3)
+                    rmse_values, _ = trainer.evaluate("test")
+            else:
+                raise InvalidBaselineException
+
+            self.metrics = rmse_values
+
+            print("Metrics collected.", rmse_values)
+
+
+        except InvalidBaselineException:
+            print(
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )        
+
+
+
+    
+    def write_plots_to_json(self):
+        file_name = "modelsplots.json"
+        data = {}
+
+        # Load existing data from file
+        try:
+            with open(file_name, "r") as infile:
+                data = json.load(infile)
+        except FileNotFoundError:
+            pass
+
+        # Update data with new arrays
+        data[self.baseline_type] = {
+            "sequence_plot_x": self.sequence_plot_x,
+            "sequence_plot_y": self.sequence_plot_y,
+            "sequence_plot_time": self.sequence_plot_time,
+            "fh_plot_x": self.fh_plot_x,
+            "fh_plot_y": self.fh_plot_y,
+            "fh_plot_time": self.fh_plot_time,
+            "metrics": self.metrics,
+        }
+
+        # Write data to file
+        with open(file_name, "w") as outfile:
+            json.dump(data, outfile)
+
+
+    
+
+

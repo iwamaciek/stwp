@@ -357,6 +357,8 @@ class Trainer:
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
         self.calculate_metrics(y_hat, y)
 
+        return self.return_metric(y_hat, y)
+
     def calculate_metrics(self, y_hat, y):
         for i, feature_name in enumerate(self.feature_list):
             y_fi = y[..., i, :].reshape(-1, 1)
@@ -364,6 +366,18 @@ class Trainer:
             rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
             mae = mean_absolute_error(y_hat_fi, y_fi)
             print(f"RMSE for {feature_name}: {rmse}; MAE for {feature_name}: {mae};")
+    
+    def return_metric(self, y_hat, y):
+        rmse_features = []
+        mae_features = []
+        for i, feature_name in enumerate(self.feature_list):
+            y_fi = y[..., i, :].reshape(-1, 1)
+            y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
+            rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
+            mae = mean_absolute_error(y_hat_fi, y_fi)
+            rmse_features.append(rmse)
+            mae_features.append(mae)
+        return rmse_features, mae_features
 
     def get_model(self):
         return self.model

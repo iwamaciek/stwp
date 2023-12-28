@@ -8,7 +8,7 @@ class Config:
     FH = 1
     INPUT_SIZE = 5
     R = 2
-    SCALER_TYPE = "robust"
+    SCALER_TYPE = "standard"
     DATA_PATH = "../data/data2019-2021.grib"
     RANDOM_STATE = 42
     INPUT_DIMS = (32, 48)

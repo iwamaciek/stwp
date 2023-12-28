@@ -21,14 +21,16 @@ class CNNDataProcessor(NNDataProcessor):
 
     def preprocess(self, subset=None):
         X_train, X_test, y_train, y_test = self.train_val_test_split()
-        X, y = self.fit_transform_scalers(X_train, X_test, y_train, y_test)
+        X, y = self.fit_transform_scalers(
+            X_train, X_test, y_train, y_test, scaler_type=self.cfg.SCALER_TYPE
+        )
         X = X.transpose((0, 1, 3, 2))
         y = y.transpose((0, 1, 3, 2))
         X = X.reshape(
             -1,
             self.num_latitudes,
             self.num_longitudes,
-            cfg.INPUT_SIZE,
+            self.cfg.INPUT_SIZE,
             self.num_features,
         )
         y = y.reshape(
@@ -47,7 +49,7 @@ class CNNDataProcessor(NNDataProcessor):
         if flat:
             input_tensor = input_tensor.reshape(
                 (
-                    cfg.BATCH_SIZE,
+                    self.cfg.BATCH_SIZE,
                     self.num_features,
                     self.num_latitudes,
                     self.num_longitudes,

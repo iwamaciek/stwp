@@ -15,56 +15,49 @@ class Trainer(GNNTrainer):
     def __init__(
         self, base_units=16, lr=0.001, gamma=0.5, subset=None, spatial_mapping=True
     ) -> None:
-        self.nn_proc = CNNDataProcessor(additional_encodings=True)
-        self.nn_proc.preprocess(subset=subset)
-        self.train_loader = self.nn_proc.train_loader
-        self.val_loader = self.nn_proc.val_loader
-        self.test_loader = self.nn_proc.test_loader
-        self.feature_list = self.nn_proc.feature_list
-        self.features = len(self.feature_list)
-        (
-            _,
-            self.latitude,
-            self.longitude,
-            self.num_features,
-        ) = self.nn_proc.get_shapes()
-        self.num_temporal_features = self.nn_proc.num_temporal_constants
-        self.num_spatial_features = self.nn_proc.num_spatial_constants
-        self.scalers = self.nn_proc.scalers
-        self.train_size = len(self.train_loader)
-        self.val_size = len(self.val_loader)
-        self.test_size = len(self.test_loader)
-        self.spatial_mapping = spatial_mapping
-        self.cfg = cfg
+        self.train_loader = None
+        self.val_loader = None
+        self.test_loader = None
+        self.feature_list = None
+        self.features = None
+        self.constants = None
         self.edge_index = None
         self.edge_weights = None
+        self.edge_attr = None
+        self.scalers = None
+        self.train_size = None
+        self.val_size = None
+        self.test_size = None
+        self.spatial_mapping = spatial_mapping
+        self.subset = subset
 
-        if subset is None:
-            self.subset = self.train_size
-        else:
-            self.subset = subset
+        self.cfg = cfg
+        self.nn_proc = CNNDataProcessor(additional_encodings=True)
+        self.init_data_process()
 
+        self.model = None
+        self.base_units = base_units
+        self.init_architecture()
+
+        self.lr = lr
+        self.gamma = gamma
+        self.criterion = torch.nn.L1Loss()
+        self.optimizer = None
+        self.lr_callback = None
+        self.ckpt_callback = None
+        self.early_stop_callback = EarlyStoppingCallback()
+        self.init_train_details()
+
+    def init_architecture(self):
         self.model = UNet(
-            features=self.num_features,
-            spatial_features=self.num_spatial_features,
-            temporal_features=self.num_temporal_features,
+            features=self.features,
+            spatial_features=self.nn_proc.num_spatial_constants,
+            temporal_features=self.nn_proc.num_temporal_constants,
             out_features=self.features,
             s=self.cfg.INPUT_SIZE,
             fh=self.cfg.FH,
-            base_units=base_units,
+            base_units=self.base_units,
         ).to(self.cfg.DEVICE)
-
-        self.criterion = torch.nn.L1Loss()
-        self.lr = lr
-        self.gamma = gamma
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-
-        # Callbacks
-        self.lr_callback = LRAdjustCallback(
-            self.optimizer, epsilon=0.01, patience=20, gamma=self.gamma
-        )
-        self.ckpt_callback = CkptCallback(self.model)
-        self.early_stop_callback = EarlyStoppingCallback(patience=60)
 
     def train(self, num_epochs=100):
         train_loss_list = []
@@ -114,8 +107,9 @@ class Trainer(GNNTrainer):
 
             avg_loss = total_loss / (self.subset * self.cfg.BATCH_SIZE)
             last_lr = self.optimizer.param_groups[0]["lr"]
+
             print(
-                f"Epoch {epoch+1}/{num_epochs}:\nTrain Loss: {avg_loss}, Last LR: {last_lr}"
+                f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.5f}, lr: {last_lr}"
             )
             train_loss_list.append(avg_loss)
 
@@ -160,7 +154,7 @@ class Trainer(GNNTrainer):
             avg_val_loss = val_loss / (
                 min(self.subset, self.val_size) * self.cfg.BATCH_SIZE
             )
-            print(f"Val Loss: {avg_val_loss}\n---------")
+            print(f"Val Loss: {avg_val_loss:.5f}\n---------")
             val_loss_list.append(avg_val_loss)
 
             self.lr_callback.step(val_loss)

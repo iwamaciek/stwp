@@ -66,7 +66,9 @@ class NNDataProcessor:
     def preprocess(self, subset=None):
         self.edge_index, self.edge_weights, self.edge_attr = self.create_edges()
         X_train, X_test, y_train, y_test = self.train_val_test_split()
-        X, y = self.fit_transform_scalers(X_train, X_test, y_train, y_test)
+        X, y = self.fit_transform_scalers(
+            X_train, X_test, y_train, y_test, scaler_type=self.cfg.SCALER_TYPE
+        )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
             X, y, subset
         )

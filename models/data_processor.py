@@ -30,6 +30,7 @@ class DataProcessor:
             temporal_encoding=self.temporal_encoding,
         )
         self.raw_data = copy.deepcopy(self.data)
+        self.raw_temporal_data = copy.deepcopy(self.temporal_data)
         self.samples, self.latitude, self.longitude, self.num_features = self.data.shape
         self.neighbours, self.sequence_length = None, None
 
@@ -50,7 +51,6 @@ class DataProcessor:
         for i in range(self.samples - self.sequence_length + 1):
             sequences[i] = self.raw_data[i : i + self.sequence_length]
         sequences = sequences.transpose((0, 2, 3, 1, 4))
-        self.samples = sequences.shape[0]
         self.data = sequences
         if self.temporal_encoding:
             time_sequences = np.empty(
@@ -60,7 +60,7 @@ class DataProcessor:
                 )
             )
             for i in range(self.samples - self.sequence_length + 1):
-                time_sequences[i] = self.temporal_data[
+                time_sequences[i] = self.raw_temporal_data[
                     i + input_size
                 ]  # Get time for the last timestamp for x
             self.temporal_data = time_sequences

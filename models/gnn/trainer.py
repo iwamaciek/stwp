@@ -32,7 +32,6 @@ class Trainer:
         spatial_mapping=True,
         additional_encodings=True,
     ):
-        self.nn_proc = None
         self.train_loader = None
         self.val_loader = None
         self.test_loader = None
@@ -58,17 +57,14 @@ class Trainer:
         self.hidden_dim = hidden_dim
         self.init_architecture()
 
-        self.criterion = None
-        self.lr = None
-        self.gamma = None
-        self.optimizer = None
-        self.lr_callback = None
-        self.ckpt_callback = None
-        self.early_stop_callback = None
-
         self.lr = lr
         self.gamma = gamma
         self.criterion = torch.nn.L1Loss()
+        # self.criterion = torch.mean(torch.log(torch.cosh((y-y_hat) + 1e-12))) # LogCosh
+        # self.criterion = torch.nn.HuberLoss()
+        self.optimizer = None
+        self.lr_callback = None
+        self.ckpt_callback = None
         self.early_stop_callback = EarlyStoppingCallback()
         self.init_train_details()
 
@@ -150,8 +146,6 @@ class Trainer:
             self.model.train()
             total_loss = 0
             for batch in self.train_loader:
-                # batch = batch.to(self.cfg.DEVICE)
-                # batch = batch.to(torch.device("cuda"))
                 y_hat = self.model(
                     batch.x, batch.edge_index, batch.edge_attr, batch.time, batch.pos
                 )
@@ -176,15 +170,13 @@ class Trainer:
             last_lr = self.optimizer.param_groups[0]["lr"]
 
             print(
-                f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.4f}, lr: {last_lr}"
+                f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.5f}, lr: {last_lr}"
             )
 
             self.model.eval()
             with torch.no_grad():
                 val_loss = 0
                 for batch in self.val_loader:
-                    # batch = batch.to(self.cfg.DEVICE)
-                    # batch = batch.to(torch.device("cuda"))
                     y_hat = self.model(
                         batch.x,
                         batch.edge_index,
@@ -206,7 +198,7 @@ class Trainer:
             )
             val_loss_list.append(avg_val_loss)
 
-            print(f"Val Loss: {avg_val_loss:.4f}\n---------")
+            print(f"Val Loss: {avg_val_loss:.5f}\n---------")
 
             self.lr_callback.step(avg_val_loss)
             self.ckpt_callback.step(avg_val_loss)

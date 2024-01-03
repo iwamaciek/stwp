@@ -1,16 +1,10 @@
-import xarray as xr
 import cfgrib
 import numpy as np
-import matplotlib.pyplot as plt
 import sys
-
 
 sys.path.append("../..")
 from models.baseline_regressor import BaselineRegressor
 from models.data_processor import DataProcessor
-
-
-grib_file = "../../2022-01-01-to-2022-12-31.grib"
 
 
 def step_split(feature, n_steps=3):
@@ -64,22 +58,12 @@ def load_tigge_0_to_12_by_6(grib_file):
 
 
 def evaluate_and_compare(data1, data2, max_samples=1):
-
     feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
-    s = 3
-    fh = 1
-    print(type(data1))
-    data1_processor = DataProcessor(data1)
 
-    X_1, y_1 = data1_processor.preprocess(s, fh)
+    X, Y = data1[..., np.newaxis, :], data2[..., np.newaxis, :]
+    data1_regressor = BaselineRegressor(X.shape, 1, feature_list)
+    data1_regressor.plot_predictions(X, Y, max_samples=max_samples)
+    rmse_scores, mae_scores = data1_regressor.evaluate(X, Y)
 
-    data2_processor = DataProcessor(data2)
-
-    X_2, y_2 = data2_processor.preprocess(s, fh)
-
-    data1_regressor = BaselineRegressor(X_1.shape, fh, feature_list)
-    data1_regressor.plot_predictions(X_1, X_2, max_samples=max_samples)
-
-    eval_scores = data1_regressor.evaluate(X_1, X_2)
     for i in range(len(feature_list)):
-        print(f"{feature_list[i]} => RMSE: {eval_scores[i]}")
+        print(f"{feature_list[i]} => RMSE: {rmse_scores[i]};  MAE: {mae_scores[i]};")

@@ -97,7 +97,7 @@ class BaselineRegressor:
         return mae_features
 
     def evaluate(self, y_hat, y_test):
-        return self.get_rmse(y_hat, y_test)
+        return self.get_rmse(y_hat, y_test), self.get_mae(y_hat, y_test)
 
     def plot_predictions(self, y_hat, y_test, max_samples, pretty=False):
         if pretty:
@@ -189,8 +189,7 @@ class BaselineRegressor:
         y_hat = self.predict_(X_test, y_test)
         if plot:
             self.plot_predictions(y_hat, y_test, max_samples=max_samples)
-        eval_scores = self.evaluate(y_hat, y_test)
-        mae_scores = self.get_mae(y_hat, y_test)
+        rmse_scores, mae_scores = self.evaluate(y_hat, y_test)
         print("=======================================")
         print("Evaluation metrics for entire test set:")
         print("=======================================")
@@ -198,7 +197,7 @@ class BaselineRegressor:
         sqrt_n = np.sqrt(y_test.shape[0] * self.latitude * self.longitude * self.fh)
         for i in range(self.num_features):
             print(
-                f"{self.feature_list[i]} => RMSE: {eval_scores[i]};  MAE: {mae_scores[i]}; SE: {np.std(y_test[...,i]) / sqrt_n}"
+                f"{self.feature_list[i]} => RMSE: {rmse_scores[i]};  MAE: {mae_scores[i]}; SE: {np.std(y_test[...,i]) / sqrt_n}"
             )
 
         return y_hat

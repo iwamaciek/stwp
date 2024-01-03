@@ -45,6 +45,23 @@ class Visualization:
             table.append(row)
 
         return table
+    
+    def create_metrics_for_scalers_table(self):
+        # Create an empty table
+        table = []
+
+        # Iterate over each baseline_type and create a row in the table
+        for baseline_type in self.plots_data.keys():
+            # Get the metrics for the current baseline_type
+            metrics = self.plots_data[baseline_type]["metrics_for_scalers"]
+
+            # Create a row with the baseline_type and metrics
+            row = {"baseline_type": baseline_type, "metrics_for_scalers": metrics}
+
+            # Add the row to the table
+            table.append(row)
+
+        return table
 
     def plot_data_sequence(self):
         # Create a grid of subplots
@@ -160,15 +177,5 @@ class Visualization:
         plt.show()
 
         
-
-    def save_plot(self, filepath):
-        # Save the plot to a file
-        # Add code here to save the plot to a file
-        pass
-
-    def show_plot(self):
-        # Display the plot
-        # Add code here to display the plot
-        pass
 
 

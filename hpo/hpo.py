@@ -18,8 +18,7 @@ from models.linear_reg.linear_regressor import LinearRegressor
 from models.linear_reg.simple_linear_regressor import SimpleLinearRegressor
 from models.grad_boost.grad_booster import GradBooster
 from models.gnn.trainer import Trainer
-from models.cnn.trainer import CNNTrainer
-
+from models.cnn.trainer import Trainer as CNNTrainer
 from models.config import config as cfg
 
 
@@ -57,6 +56,9 @@ class HPO:
         self.fh = 1
         self.best_fh = self.fh
         self.regressors = ["lasso", "ridge", "elastic_net"]
+        
+        self.scalers = ["standard", "minmax", "maxabs", "robust"]
+
         self.max_alpha = max_alpha
         self.verbosity = False
         self.params = {}
@@ -71,6 +73,8 @@ class HPO:
         self.fh_plot_time = []
 
         self.metrics = []
+
+        self.metrics_for_scalers = {}
 
     def run_hpo(self):
         return -1
@@ -195,7 +199,7 @@ class HPO:
                     rmse_values, _ = trainer.evaluate("test")
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = Trainer()
+                    trainer = CNNTrainer()
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
@@ -395,7 +399,7 @@ class HPO:
                     rmse_values, _ = trainer.evaluate("test")
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = Trainer()
+                    trainer = CNNTrainer()
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
@@ -460,6 +464,7 @@ class HPO:
         self.run_study()
         self.determine_best_fh()
         self.collect_metrics()
+        self.test_scalers()
         self.write_params_to_json()
 
     def report(self):
@@ -532,14 +537,14 @@ class HPO:
             elif self.baseline_type == "gnn":
                     trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
                     cfg.FH  = self.fh
-                    cfg.INPUT_SIZE = s
+                    cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=3)
                     rmse_values, _ = trainer.evaluate("test")
             elif self.baseline_type == "cnn":
-                    trainer = Trainer()
+                    trainer = CNNTrainer()
                     cfg.FH  = self.fh
-                    cfg.INPUT_SIZE = s
+                    cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(3)
                     rmse_values, _ = trainer.evaluate("test")
@@ -579,6 +584,7 @@ class HPO:
             "fh_plot_y": self.fh_plot_y,
             "fh_plot_time": self.fh_plot_time,
             "metrics": self.metrics,
+            "metrics_for_scalers": self.metrics_for_scalers,
         }
 
         # Write data to file
@@ -586,6 +592,80 @@ class HPO:
             json.dump(data, outfile)
 
 
-    
+    def test_scalers(self):
+        try:
+           
 
+            for scaler in self.scalers:
+                self.processor.upload_data(self.data)
+                X, y = self.processor.preprocess(self.best_s,self.best_fh, self.use_neighbours)
+                X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
+                start_time = time.time()
+                if self.baseline_type == "simple-linear":
+                    linearreg = SimpleLinearRegressor(
+                        X.shape,
+                        self.best_fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                        scaler_type=scaler
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    mean_rmse = np.mean(rmse_values)
+
+                elif self.baseline_type == "linear":
+                    linearreg = LinearRegressor(
+                        X.shape,
+                        self.best_fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                        scaler_type=scaler
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "lgbm":
+                    regressor = GradBooster(X.shape, self.best_fhfh, self.feature_list, scaler_type=scaler)
+                    regressor.train(X_train, y_train, normalize=True)
+                    y_hat = regressor.predict_(X_test, y_test)
+                    rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "gnn":
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    cfg.FH  = self.best_fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(num_epochs=3)
+                    rmse_values, _ = trainer.evaluate("test")
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "cnn":
+                    trainer = CNNTrainer()
+                    cfg.FH  = self.best_fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(3)
+                    rmse_values, _ = trainer.evaluate("test")
+                    mean_rmse = np.mean(rmse_values)
+                else:
+                    raise InvalidBaselineException
+                
+                end_time = time.time()
+
+                
+                execution_time = end_time - start_time
+
+                self.metrics_for_scalers[scaler] = {
+                    "rmse": mean_rmse,
+                    "execution_time": execution_time
+                }
+                
+           
+        except InvalidBaselineException:
+            print(
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   
 

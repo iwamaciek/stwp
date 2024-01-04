@@ -15,6 +15,7 @@ emc.py
 *.zip
 gnn_test
 *.txt
+.DS_store
 catboost_info
 data
 *.png

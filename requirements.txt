@@ -2,6 +2,7 @@ cdsapi
 jupyterlab~=3.6.3
 matplotlib
 xarray
+xgboost
 cfgrib
 eccodes
 ecmwflibs
@@ -15,3 +16,5 @@ scipy
 torch
 torch_geometric
 statsmodels
+pygrib
+catboost

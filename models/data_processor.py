@@ -256,7 +256,7 @@ class DataProcessor:
     @staticmethod
     def get_spatial_info():
         res = 0.25
-        north, west, south, east = BIG_AREA
+        north, west, south, east = SMALL_AREA
         spatial_limits = [west, east, south, north]
         we_span_1d = np.arange(west, east + res, res)
         ns_span_1d = np.arange(north, south - res, -res)

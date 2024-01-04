@@ -13,6 +13,7 @@ from sklearn.preprocessing import (
     RobustScaler,
 )
 from utils.draw_functions import draw_poland
+from datetime import datetime
 
 
 class BaselineRegressor:
@@ -295,3 +296,10 @@ class BaselineRegressor:
                     else:
                         Y_out[la, lo, n] = Y[la, lo]
         return Y_out
+
+    def save_prediction_tensor(self, y_hat, path=None):
+        if path is None:
+            t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            name = str(self.__class__).split(".")[-2]
+            path = f"../data/pred/{name}_{t}.npy"
+        np.save(path, y_hat)

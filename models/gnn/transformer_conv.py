@@ -45,7 +45,7 @@ class TransformerGNN(torch.nn.Module):
         x = self.layer_norm_embed(x).relu()
         for transgnn in self.transgnns:
             x = x + transgnn(x, edge_index, edge_attr).relu()  # option A
-            # x = (x + transgnn(x, edge_index, edge_attr)).relu()     # option B
+            # x = (x + transgnn(x, edge_index, edge_attr)).relu()       # option B
             # x = transgnn(x, edge_index, edge_attr).relu()             # option C
         x = self.mlp_decoder(x)
         return x.view(x.size(0), x.size(1) // self.fh, self.fh)

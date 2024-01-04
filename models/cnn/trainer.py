@@ -9,6 +9,8 @@ from models.gnn.callbacks import (
 from models.gnn.trainer import Trainer as GNNTrainer
 import torch
 import time
+import numpy as np
+from datetime import datetime
 
 
 class Trainer(GNNTrainer):
@@ -167,7 +169,7 @@ class Trainer(GNNTrainer):
         print(f"{end - start} [s]")
         self.plot_loss(val_loss_list, train_loss_list)
 
-    def inverse_normalization_predict(self, X, y, edge_index, edge_attr, pos, time):
+    def predict(self, X, y, edge_index, edge_attr, pos, time, inverse_norm=True):
         X = (
             X.reshape(
                 -1, self.latitude, self.longitude, self.cfg.INPUT_SIZE * self.features
@@ -201,3 +203,15 @@ class Trainer(GNNTrainer):
                 )
 
         return y, y_hat
+
+    def save_prediction_tensor(self, y_hat, path=None):
+        if isinstance(y_hat, torch.Tensor):
+            y_hat = y_hat.cpu().detach().numpy()
+        elif not isinstance(y_hat, np.ndarray):
+            raise ValueError(
+                "Input y_hat should be either a PyTorch Tensor or a NumPy array."
+            )
+        if path is None:
+            t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            path = f"../data/pred/unet_{t}.npy"
+        np.save(path, y_hat)

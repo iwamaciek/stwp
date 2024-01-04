@@ -12,8 +12,9 @@ class LinearRegressor(BaselineRegressor):
         feature_list,
         regressor_type="linear",
         alpha=1.0,
+        scaler_type="standard",
     ):
-        super().__init__(X_shape, fh, feature_list)
+        super().__init__(X_shape, fh, feature_list, scaler_type=scaler_type)
 
         if regressor_type == "linear":
             self.model = LinearRegression()

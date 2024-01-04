@@ -32,7 +32,7 @@ class HPO:
         self,
         baseline_type,
         n_trials,
-        dataset,
+        # dataset,
         use_neighbours=False,
         # max_sequence_length = 15,
         sequence_length=1,
@@ -56,8 +56,10 @@ class HPO:
         self.fh = 1
         self.best_fh = self.fh
         self.regressors = ["lasso", "ridge", "elastic_net"]
+
+        self.subset = 1
         
-        self.scalers = ["standard", "minmax", "maxabs", "robust"]
+        self.scalers = ["standard", "min_max", "max_abs", "robust"]
 
         self.max_alpha = max_alpha
         self.verbosity = False
@@ -75,6 +77,10 @@ class HPO:
         self.metrics = []
 
         self.metrics_for_scalers = {}
+
+
+        self.not_normalized_plot_sequence = {}
+        self.not_normalized_plot_fh = {}
 
     def run_hpo(self):
         return -1
@@ -170,6 +176,7 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
 
                 elif self.baseline_type == "linear":
@@ -183,28 +190,32 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "lgbm":
                     regressor = GradBooster(X.shape, self.fh, self.feature_list)
                     regressor.train(X_train, y_train, normalize=True)
                     y_hat = regressor.predict_(X_test, y_test)
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = regressor.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "gnn":
-                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=3)
                     rmse_values, _ = trainer.evaluate("test")
+                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer()
+                    trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
                     trainer.train(3)
                     rmse_values, _ = trainer.evaluate("test")
+                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
                     mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException
@@ -213,6 +224,8 @@ class HPO:
 
                 self.sequence_plot_x.append(s)
                 self.sequence_plot_y.append(mean_rmse)
+
+                self.not_normalized_plot_sequence[s] = rmse_not_normalized
 
                 execution_time = end_time - start_time
                 self.sequence_plot_time.append(execution_time)
@@ -289,6 +302,7 @@ class HPO:
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "gnn" or self.baseline_type == "cnn":
                 print("HPO not implemented for neural nets")
+                return 0
             else:
                 raise InvalidBaselineException
 
@@ -370,6 +384,7 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
 
                 elif self.baseline_type == "linear":
@@ -383,28 +398,32 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "lgbm":
                     regressor = GradBooster(X.shape, fh, self.feature_list)
                     regressor.train(X_train, y_train, normalize=True)
                     y_hat = regressor.predict_(X_test, y_test)
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = regressor.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "gnn":
-                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=3)
                     rmse_values, _ = trainer.evaluate("test")
+                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer()
+                    trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(3)
                     rmse_values, _ = trainer.evaluate("test")
+                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
                     mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException
@@ -413,6 +432,8 @@ class HPO:
 
                 self.fh_plot_x.append(fh)
                 self.fh_plot_y.append(mean_rmse)
+
+                self.not_normalized_plot_fh[fh] = rmse_not_normalized
 
                 execution_time = end_time - start_time
                 self.fh_plot_time.append(execution_time)
@@ -461,11 +482,13 @@ class HPO:
     def run_full_study(self):
         self.determine_best_s()
         # self.best_s = 3
-        self.run_study()
+        if self.baseline_type not in ['gnn', 'cnn']:
+            self.run_study()
         self.determine_best_fh()
         self.collect_metrics()
-        self.test_scalers()
+        # self.test_scalers()
         self.write_params_to_json()
+        self.write_plots_to_json()
 
     def report(self):
         self.plot_sequence()
@@ -535,14 +558,14 @@ class HPO:
                 y_hat = regressor.predict_(X_test, y_test)
                 rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
             elif self.baseline_type == "gnn":
-                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=3)
                     rmse_values, _ = trainer.evaluate("test")
             elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer()
+                    trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
@@ -585,6 +608,8 @@ class HPO:
             "fh_plot_time": self.fh_plot_time,
             "metrics": self.metrics,
             "metrics_for_scalers": self.metrics_for_scalers,
+            "not_normalized_plot_sequence": self.not_normalized_plot_sequence,
+            "not_normalized_plot_fh": self.not_normalized_plot_fh,
         }
 
         # Write data to file
@@ -635,17 +660,19 @@ class HPO:
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "gnn":
-                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3)
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
                     cfg.FH  = self.best_fh
                     cfg.INPUT_SIZE = self.best_s
+                    cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=3)
                     rmse_values, _ = trainer.evaluate("test")
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer()
+                    trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = self.best_fh
                     cfg.INPUT_SIZE = self.best_s
+                    cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
                     trainer.train(3)
                     rmse_values, _ = trainer.evaluate("test")

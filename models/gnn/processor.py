@@ -66,12 +66,14 @@ class NNDataProcessor:
     def preprocess(self, subset=None):
         self.edge_index, self.edge_weights, self.edge_attr = self.create_edges()
         X_train, X_test, y_train, y_test = self.train_val_test_split()
+        # print("Before scaling:", X_train[...,2].min(), X_train[...,2].max(), y_train[...,2].min(), y_train[...,2].min(), X_test[...,2].min(), X_test[...,2].min())
         X, y = self.fit_transform_scalers(
             X_train, X_test, y_train, y_test, scaler_type=self.cfg.SCALER_TYPE
         )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
             X, y, subset
         )
+        # try inverse scale here
 
     def train_val_test_split(self):
         X, y = self.data_proc.preprocess(self.cfg.INPUT_SIZE, self.cfg.FH)
@@ -159,6 +161,28 @@ class NNDataProcessor:
         y = y.transpose((0, 1, 3, 2))
 
         return X, y
+
+    def inverse_transform_scalers(self, X, y):
+        # y = y.reshape((-1, self.latitude, self.longitude, self.features, self.cfg.FH))
+        # y_hat = self.model(X, edge_index, edge_attr, t, s).reshape(
+        #     (-1, self.latitude, self.longitude, self.features, self.cfg.FH)
+        # )
+        #
+        # y = y.cpu().detach().numpy()
+        # y_hat = y_hat.cpu().detach().numpy()
+        #
+        # if inverse_norm:
+        #     y_shape = (self.latitude, self.longitude, self.cfg.FH)
+        #     for i in range(self.features):
+        #         for j in range(y_hat.shape[0]):
+        #             yi = y[j, ..., i, :].copy().reshape(-1, 1)
+        #             yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
+        #
+        #             y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(y_shape)
+        #             y_hat[j, ..., i, :] = (
+        #                 self.scalers[i].inverse_transform(yhat_i).reshape(y_shape)
+        #             )
+        pass
 
     def create_edges(self, r=None):
         if r is None:

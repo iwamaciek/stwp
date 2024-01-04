@@ -34,3 +34,13 @@ Sample:
 ```shell
 python hpo_linear_regression.py linear 5 False
 ```
+
+### API dockerization
+Create image:
+```shell
+docker build -t meteo-api ./api
+```
+Run the container
+```shell
+docker run -it --rm -p 8080:8888 --name api meteo-api
+```

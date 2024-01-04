@@ -19,6 +19,7 @@ from models.gnn.gat_conv import GATConvNN
 from models.gnn.gen_conv import GENConvNN
 from models.gnn.pdn_conv import PDNConvNN
 from utils.draw_functions import draw_poland
+from datetime import datetime
 
 
 class Trainer:
@@ -220,27 +221,28 @@ class Trainer:
         plt.legend()
         plt.show()
 
-    def inverse_normalization_predict(self, X, y, edge_index, edge_attr, s, t):
+    def predict(self, X, y, edge_index, edge_attr, s, t, inverse_norm=True):
         y = y.reshape((-1, self.latitude, self.longitude, self.features, self.cfg.FH))
-        y = y.cpu().detach().numpy()
-
-        y_hat = self.model(X, edge_index, edge_attr, t, s)
-        y_hat = y_hat.reshape(
+        y_hat = self.model(X, edge_index, edge_attr, t, s).reshape(
             (-1, self.latitude, self.longitude, self.features, self.cfg.FH)
         )
+
+        y = y.cpu().detach().numpy()
         y_hat = y_hat.cpu().detach().numpy()
 
-        yshape = (self.latitude, self.longitude, self.cfg.FH)
+        if inverse_norm:
+            y_shape = (self.latitude, self.longitude, self.cfg.FH)
+            for i in range(self.features):
+                for j in range(y_hat.shape[0]):
+                    yi = y[j, ..., i, :].copy().reshape(-1, 1)
+                    yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
-        for i in range(self.features):
-            for j in range(y_hat.shape[0]):
-                yi = y[j, ..., i, :].copy().reshape(-1, 1)
-                yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
-
-                y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
-                y_hat[j, ..., i, :] = (
-                    self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
-                )
+                    y[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yi).reshape(y_shape)
+                    )
+                    y_hat[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yhat_i).reshape(y_shape)
+                    )
 
         return y, y_hat
 
@@ -264,7 +266,7 @@ class Trainer:
             }
 
         X, y = sample.x, sample.y
-        y, y_hat = self.inverse_normalization_predict(
+        y, y_hat = self.predict(
             X, y, sample.edge_index, sample.edge_attr, sample.pos, sample.time
         )
         latitude, longitude = self.latitude, self.longitude
@@ -319,7 +321,7 @@ class Trainer:
 
         self.calculate_metrics(y_hat, y)
 
-    def evaluate(self, data_type="test"):
+    def evaluate(self, data_type="test", verbose=True, inverse_norm=True):
         if data_type == "train":
             loader = self.train_loader
         elif data_type == "test":
@@ -333,13 +335,14 @@ class Trainer:
         y = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         for batch in loader:
-            y_i, y_hat_i = self.inverse_normalization_predict(
+            y_i, y_hat_i = self.predict(
                 batch.x,
                 batch.y,
                 batch.edge_index,
                 batch.edge_attr,
                 batch.pos,
                 batch.time,
+                inverse_norm=inverse_norm,
             )
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
@@ -347,19 +350,10 @@ class Trainer:
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
-        self.calculate_metrics(y_hat, y)
 
-        return self.return_metric(y_hat, y)
+        return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
 
-    def calculate_metrics(self, y_hat, y):
-        for i, feature_name in enumerate(self.feature_list):
-            y_fi = y[..., i, :].reshape(-1, 1)
-            y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
-            rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
-            mae = mean_absolute_error(y_hat_fi, y_fi)
-            print(f"RMSE for {feature_name}: {rmse}; MAE for {feature_name}: {mae};")
-    
-    def return_metric(self, y_hat, y):
+    def calculate_metrics(self, y_hat, y, verbose=False):
         rmse_features = []
         mae_features = []
         for i, feature_name in enumerate(self.feature_list):
@@ -367,9 +361,22 @@ class Trainer:
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
             rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
             mae = mean_absolute_error(y_hat_fi, y_fi)
+            if verbose:
+                print(
+                    f"RMSE for {feature_name}: {rmse}; MAE for {feature_name}: {mae};"
+                )
             rmse_features.append(rmse)
             mae_features.append(mae)
         return rmse_features, mae_features
 
-    def get_model(self):
-        return self.model
+    def save_prediction_tensor(self, y_hat, path=None):
+        if isinstance(y_hat, torch.Tensor):
+            y_hat = y_hat.cpu().detach().numpy()
+        elif not isinstance(y_hat, np.ndarray):
+            raise ValueError(
+                "Input y_hat should be either a PyTorch Tensor or a NumPy array."
+            )
+        if path is None:
+            t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            path = f"../data/pred/{self.architecture}_{t}.npy"
+        np.save(path, y_hat)

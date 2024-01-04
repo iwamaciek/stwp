@@ -16,5 +16,9 @@ scipy
 torch
 torch_geometric
 statsmodels
+fastapi
+uvicorn
 pygrib
 catboost
+fastapi
+uvicorn

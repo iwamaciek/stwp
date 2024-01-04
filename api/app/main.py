@@ -9,6 +9,11 @@ import numpy as np
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+import sys
+sys.path.append("..")
+from model.utils.get_data import DataImporter
+from model.config import config as cfg
 
 app = FastAPI()
 
@@ -24,6 +29,12 @@ lng_min = float(min(json_data[str(lat_min)].keys()))
 lng_max = float(max(json_data[str(lat_min)].keys()))
 
 coord_acc = 0.25
+
+previous_data_gather = datetime.now()
+dataImporter = DataImporter()
+dataImporter.download_data()
+cfg.DATA_PATH = "../model/data/data-example.grib"
+cfg.TRAIN_RATIO = 0
 
 def get_fractions(lat, lng):
 
@@ -187,13 +198,18 @@ async def get_weather(
     latitude: float = Query(..., description="Latitude of the location"),
     longitude: float = Query(..., description="Longitude of the location"),
 ):
+    if((datetime.now() - previous_data_gather).seconds >= 21600): # 6 hours
+        # Get new data - not implemented yet
+        pass
     result = get_values_by_lat_lng(latitude, longitude)
     return result
 
 
 @app.get("/maps")
 async def get_maps():
-    create_maps()
+    if((datetime.now() - previous_data_gather).seconds >= 21600): # 6 hours
+        # Get new data - not implemented yet
+        pass
     images = os.listdir("./maps")  # Get a list of all files in the "maps" folder
 
     # Create a Zip file
@@ -208,5 +224,7 @@ async def get_maps():
 
 if __name__ == "__main__":
     import uvicorn
+
+    create_maps()
 
     uvicorn.run(app, host="0.0.0.0", port=8888)

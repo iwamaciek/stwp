@@ -3,3 +3,8 @@ numpy
 matplotlib
 cartopy
 uvicorn
+scikit-learn
+xarray
+cfgrib
+eccodes
+cdsapi

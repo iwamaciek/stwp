@@ -6,8 +6,16 @@ COPY requirements ./
 
 RUN pip install --no-cache-dir -r requirements
 
+COPY script.sh .
+
+RUN ./script.sh
+
+RUN apt install libeccodes-dev -y
+
 COPY ./app/ .
 
-EXPOSE 8888
+COPY ./model /model
+
+COPY ./.cdsapirc /
 
 CMD ["python", "main.py"]

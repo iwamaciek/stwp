@@ -10,6 +10,11 @@ import numpy as np
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+import sys
+sys.path.append("..")
+from model.utils.get_data import DataImporter
+from model.config import config as cfg
 import matplotlib
 
 # Initialize FastAPI app
@@ -27,6 +32,12 @@ lng_max = float(max(json_data[str(lat_min)].keys()))
 
 # Set the coordinate accuracy
 coord_acc = 0.25
+
+previous_data_gather = datetime.now()
+dataImporter = DataImporter()
+dataImporter.download_data()
+cfg.DATA_PATH = "../model/data/data-example.grib"
+cfg.TRAIN_RATIO = 0
 
 
 # Function to calculate the fractions used for interpolation
@@ -224,13 +235,18 @@ async def get_weather(
     latitude: float = Query(..., description="Latitude of the location"),
     longitude: float = Query(..., description="Longitude of the location"),
 ):
+    if((datetime.now() - previous_data_gather).seconds >= 21600): # 6 hours
+        # Get new data - not implemented yet
+        pass
     return get_values_by_lat_lng(latitude, longitude)
 
 
 # Define endpoint for maps
 @app.get("/maps")
 async def get_maps():
-    create_maps()
+    if((datetime.now() - previous_data_gather).seconds >= 21600): # 6 hours
+        # Get new data - not implemented yet
+        pass
     # Get a list of all files in the "maps" folder
     images = os.listdir("./maps")
 
@@ -247,5 +263,7 @@ async def get_maps():
 # Main function
 if __name__ == "__main__":
     import uvicorn
+
+    create_maps()
 
     uvicorn.run(app, host="0.0.0.0", port=8888)

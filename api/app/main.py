@@ -41,6 +41,14 @@ def get_fractions(lat, lng):
 
     return lat_distance, long_distance
 
+def custom_formatter(x):
+    if x == int(x) and x != 1:
+        return f"{int(x)}"
+    elif 0 <= x <= 1:
+        return f"{int(x * 100)}%"
+    else:
+        return f"{x}"
+
 
 def interpolate_value(array, lat, lng):
     lat_index = int(np.floor((lat_max - lat) / coord_acc))
@@ -150,6 +158,29 @@ def create_maps():
 
             plt.clf()
 
+        # Create a new figure for the colorbar
+        fig, ax = plt.subplots(figsize=(24, 3))
+        cbar = plt.colorbar(cf, cax=ax, orientation='horizontal')
+
+        # Calculate min and max
+        min_val = np.min(ranges[feature_name])
+        max_val = np.max(ranges[feature_name])
+
+        # Generate a sequence of numbers from min to max
+        ticks = np.linspace(min_val, max_val, num=11)
+
+        # Set the ticks
+        cbar.set_ticks(ticks)
+
+        # Set the tick labels and increase font size
+        cbar.set_ticklabels([custom_formatter(tick) for tick in ticks], fontsize=32, color='white')
+
+        plt.subplots_adjust(left=0.03, right=0.97, top=0.8, bottom=0.2)
+
+        plt.savefig(f"./maps/{feature_name}_legend.png", transparent=True)
+
+        plt.clf()
+
 
 @app.get("/weather")
 async def get_weather(
@@ -162,7 +193,7 @@ async def get_weather(
 
 @app.get("/maps")
 async def get_maps():
-    # create_maps()
+    create_maps()
     images = os.listdir("./maps")  # Get a list of all files in the "maps" folder
 
     # Create a Zip file
@@ -171,28 +202,11 @@ async def get_maps():
             for image in images:
                 full_path = os.path.join("./maps", image)
                 archive.write(full_path, arcname=os.path.join("maps", image))
-                
+
     return FileResponse("./maps.zip", media_type="application/zip")
 
-
-# http://127.0.0.1:8000/weather?latitude=49.7128&longitude=21.006
 
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8888)
-
-    # pprint(grib_data[0].u10)
-    # pprint(grib_data[0].v10)
-
-    # plt.imshow(grib_data[0].tcc[2])
-
-    # plt.show()
-    # create_maps()
-
-    # pprint(grib_data)
-
-    # val = get_values_by_lat_lng(53.0, 17.0)
-    # paint_map(grib_data)
-
-    # pprint(val)

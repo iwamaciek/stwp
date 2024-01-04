@@ -257,12 +257,12 @@ class NNDataProcessor:
         Maps latitude-longitude span e.g. (32,48) -> (25,45)
         """
         if flat:
-            self.cfg.BATCH_SIZE = int(
+            batch_size = int(
                 input_tensor.shape[0] / self.num_latitudes / self.num_longitudes
             )
             input_tensor = input_tensor.reshape(
                 (
-                    self.cfg.BATCH_SIZE,
+                    batch_size,
                     self.num_latitudes,
                     self.num_longitudes,
                     self.num_features,

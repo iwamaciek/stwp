@@ -17,3 +17,6 @@ gnn_test
 *.txt
 catboost_info
 data
+*.png
+*.svg
+*.pdf

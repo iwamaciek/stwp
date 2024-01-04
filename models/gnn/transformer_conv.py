@@ -28,7 +28,9 @@ class TransformerGNN(torch.nn.Module):
         self.transgnns = nn.ModuleList(
             [
                 TransformerConv(
-                    in_channels=hidden_dim, out_channels=hidden_dim, edge_dim=edge_dim
+                    in_channels=hidden_dim,
+                    out_channels=hidden_dim,
+                    edge_dim=edge_dim,  # , dropout=0.1
                 )
                 for _ in range(N)
             ]
@@ -42,6 +44,8 @@ class TransformerGNN(torch.nn.Module):
         x = self.st_encoder(x, t, s)
         x = self.layer_norm_embed(x).relu()
         for transgnn in self.transgnns:
-            x = transgnn(x, edge_index, edge_attr).relu()
+            x = x + transgnn(x, edge_index, edge_attr).relu()  # option A
+            # x = (x + transgnn(x, edge_index, edge_attr)).relu()     # option B
+            # x = transgnn(x, edge_index, edge_attr).relu()             # option C
         x = self.mlp_decoder(x)
         return x.view(x.size(0), x.size(1) // self.fh, self.fh)

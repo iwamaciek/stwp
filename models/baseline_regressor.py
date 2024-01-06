@@ -184,6 +184,7 @@ class BaselineRegressor:
             y_hat = np.array(y_hat).transpose((1, 2, 3, 4, 0))
         else:
             y_hat = self.predict_autoreg(X_test, y_test)
+        y_hat = self.clip_total_cloud_cover(y_hat)
         return y_hat
 
     def predict_and_evaluate(self, X_test, y_test, plot=True, max_samples=5):
@@ -273,12 +274,10 @@ class BaselineRegressor:
         shape: (latitude, longitude, neighbours, features)
         It might be in data_processor
         """
-        # TODO function that maps no. of neighbours -> radius
         if self.neighbours <= 5:
             radius = 1
         elif self.neighbours <= 13:
             radius = 2
-        # ...
         else:
             radius = 3
 
@@ -303,3 +302,8 @@ class BaselineRegressor:
             name = str(self.__class__).split(".")[-2]
             path = f"../data/pred/{name}_{t}.npy"
         np.save(path, y_hat)
+
+    @staticmethod
+    def clip_total_cloud_cover(y_hat, idx=2):
+        y_hat[..., idx] = np.clip(y_hat[..., idx], 0, 1)
+        return y_hat

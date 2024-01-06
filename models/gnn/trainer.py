@@ -243,7 +243,8 @@ class Trainer:
                     y_hat[j, ..., i, :] = (
                         self.scalers[i].inverse_transform(yhat_i).reshape(y_shape)
                     )
-
+        if inverse_norm:
+            y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat
 
     def plot_predictions(self, data_type="test", pretty=False):
@@ -380,3 +381,8 @@ class Trainer:
             t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             path = f"../data/pred/{self.architecture}_{t}.npy"
         np.save(path, y_hat)
+
+    @staticmethod
+    def clip_total_cloud_cover(y_hat, idx=2):
+        y_hat[..., idx, :] = np.clip(y_hat[..., idx, :], 0, 1)
+        return y_hat

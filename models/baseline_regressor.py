@@ -301,7 +301,7 @@ class BaselineRegressor:
             t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             name = str(self.__class__).split(".")[-2]
             path = f"../data/pred/{name}_{t}.npy"
-        np.save(path, y_hat)
+        np.save(path, y_hat.transpose(0, 1, 2, 4, 3))
 
     @staticmethod
     def clip_total_cloud_cover(y_hat, idx=2):

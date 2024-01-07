@@ -13,11 +13,7 @@ from models.gnn.callbacks import (
     CkptCallback,
     EarlyStoppingCallback,
 )
-from models.gnn.cgc_conv import CrystalGNN
-from models.gnn.transformer_conv import TransformerGNN
-from models.gnn.gat_conv import GATConvNN
-from models.gnn.gen_conv import GENConvNN
-from models.gnn.pdn_conv import PDNConvNN
+from models.gnn.gnn_module import GNNModule
 from utils.draw_functions import draw_poland
 from datetime import datetime
 
@@ -103,6 +99,7 @@ class Trainer:
 
     def init_architecture(self):
         init_dict = {
+            "arch": self.architecture,
             "input_features": self.features,
             "output_features": self.features,
             "edge_dim": self.edge_attr.size(-1),
@@ -111,22 +108,9 @@ class Trainer:
             "input_s_dim": self.nn_proc.num_spatial_constants,
             "input_size": self.cfg.INPUT_SIZE,
             "fh": self.cfg.FH,
+            "num_graph_cells": self.cfg.GRAPH_CELLS,
         }
-
-        if self.architecture == "cgcn":
-            self.model = CrystalGNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "trans":
-            self.model = TransformerGNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "gat":
-            self.model = GATConvNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "gen":
-            self.model = GENConvNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "pdn":
-            self.model = PDNConvNN(**init_dict).to(self.cfg.DEVICE)
-        else:
-            self.model = None
-            print(f"Architecture {self.architecture} not implemented")
-            raise NotImplemented
+        self.model = GNNModule(**init_dict).to(self.cfg.DEVICE)
 
     def init_train_details(self):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)

@@ -574,6 +574,7 @@ class HPO:
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
                     rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_values = rmse_values[0]
             elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = self.fh
@@ -581,6 +582,7 @@ class HPO:
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
                     rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_values = rmse_values[0]
             else:
                 raise InvalidBaselineException
 

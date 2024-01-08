@@ -111,6 +111,7 @@ class Trainer:
             "num_graph_cells": self.cfg.GRAPH_CELLS,
         }
         self.model = GNNModule(**init_dict).to(self.cfg.DEVICE)
+        # self.model = torch.compile(self.model)
 
     def init_train_details(self):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -336,6 +337,88 @@ class Trainer:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
 
+        return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
+
+    def autoreg_evaluate(self, data_type="test", fh=2, verbose=True, inverse_norm=True):
+        # Only works for fh=1 for now
+        self.cfg.BATCH_SIZE = 1
+        self.cfg.FH = fh
+        self.update_data_process()
+        self.cfg.FH = 1
+
+        if data_type == "train":
+            loader = self.train_loader
+        elif data_type == "test":
+            loader = self.test_loader
+        elif data_type == "val":
+            loader = self.val_loader
+        else:
+            print("Invalid type: (train, test, val)")
+            raise ValueError
+
+        y = torch.empty((0, self.latitude, self.longitude, self.features, fh)).to(
+            self.cfg.DEVICE
+        )
+        y_hat = torch.empty((0, self.latitude, self.longitude, self.features, fh)).to(
+            self.cfg.DEVICE
+        )
+        y_shape = (self.latitude * self.longitude, self.features, 1)
+        for batch in loader:
+            y_hat_autoreg_i = torch.zeros_like(batch.y)
+            y_i = torch.zeros_like(batch.y)
+            for t in range(fh):
+                input_batch = batch.clone()
+                input_batch.y = input_batch.y[..., t : t + 1]
+                if t == 0:
+                    y_it, y_hat_it = self.predict(
+                        input_batch.x,
+                        input_batch.y,
+                        input_batch.edge_index,
+                        input_batch.edge_attr,
+                        input_batch.pos,
+                        input_batch.time,
+                        inverse_norm=inverse_norm,
+                    )
+                else:
+                    input_batch.x = torch.cat(
+                        (input_batch.x[..., :-t], y_hat_autoreg_i[..., :t]), dim=-1
+                    )
+                    y_it, y_hat_it = self.predict(
+                        input_batch.x,
+                        input_batch.y,
+                        input_batch.edge_index,
+                        input_batch.edge_attr,
+                        input_batch.pos,
+                        input_batch.time,
+                        inverse_norm=inverse_norm,
+                    )
+                y_hat_i = torch.from_numpy(y_hat_it).to(self.cfg.DEVICE)
+                y_it = torch.from_numpy(y_it).to(self.cfg.DEVICE)
+                y_hat_autoreg_i[..., t : t + 1] = y_hat_i.reshape(y_shape)
+                y_i[..., t : t + 1] = y_it.reshape(y_shape)
+
+            y = torch.cat(
+                (y, y_i.reshape(1, self.latitude, self.longitude, self.features, fh)),
+                dim=0,
+            )
+            y_hat = torch.cat(
+                (
+                    y_hat,
+                    y_hat_autoreg_i.reshape(
+                        1, self.latitude, self.longitude, self.features, fh
+                    ),
+                ),
+                dim=0,
+            )
+
+        y_hat = y_hat.cpu().detach().numpy()
+        y = y.cpu().detach().numpy()
+
+        if self.spatial_mapping:
+            y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
+            y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
+
+        self.cfg.FH = 1
         return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
 
     def calculate_metrics(self, y_hat, y, verbose=False):

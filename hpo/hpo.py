@@ -32,7 +32,7 @@ class HPO:
         self,
         baseline_type,
         n_trials,
-        # dataset,
+        dataset,
         use_neighbours=False,
         # max_sequence_length = 15,
         sequence_length=1,
@@ -41,7 +41,10 @@ class HPO:
         sequence_regressor="ridge",
         fh_n_trials=15,
         max_alpha=10,
+        num_epochs=3,
     ):
+        
+
         self.baseline_type = baseline_type
         self.n_trials = n_trials
         self.use_neighbours = use_neighbours
@@ -58,6 +61,7 @@ class HPO:
         self.regressors = ["lasso", "ridge", "elastic_net"]
 
         self.subset = 1
+        self.num_epochs = num_epochs
         
         self.scalers = ["standard", "min_max", "max_abs", "robust"]
 
@@ -177,6 +181,7 @@ class HPO:
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
                     rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
+                    print(rmse_not_normalized)
                     mean_rmse = np.mean(rmse_values)
 
                 elif self.baseline_type == "linear":
@@ -204,18 +209,21 @@ class HPO:
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
-                    trainer.train(num_epochs=3)
-                    rmse_values, _ = trainer.evaluate("test")
-                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
+                    trainer.train(num_epochs=self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_not_normalized = rmse_not_normalized[0]
+
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
-                    trainer.train(3)
-                    rmse_values, _ = trainer.evaluate("test")
-                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
+                    trainer.train(self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException
@@ -412,18 +420,20 @@ class HPO:
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
-                    trainer.train(num_epochs=3)
-                    rmse_values, _ = trainer.evaluate("test")
-                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
+                    trainer.train(num_epochs=self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
-                    trainer.train(3)
-                    rmse_values, _ = trainer.evaluate("test")
-                    # rmse_not_normalized, _ = trainer.evaluate("test", inversnorm=False)
+                    trainer.train(self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException
@@ -562,15 +572,15 @@ class HPO:
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
-                    trainer.train(num_epochs=3)
-                    rmse_values, _ = trainer.evaluate("test")
+                    trainer.train(num_epochs=self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
             elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
-                    trainer.train(3)
-                    rmse_values, _ = trainer.evaluate("test")
+                    trainer.train(self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
             else:
                 raise InvalidBaselineException
 
@@ -665,8 +675,8 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
-                    trainer.train(num_epochs=3)
-                    rmse_values, _ = trainer.evaluate("test")
+                    trainer.train(num_epochs=self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
@@ -674,8 +684,8 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
-                    trainer.train(3)
-                    rmse_values, _ = trainer.evaluate("test")
+                    trainer.train(self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False)
                     mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException

@@ -18,7 +18,7 @@ from datetime import datetime
 
 class BaselineRegressor:
     def __init__(
-        self, X_shape: tuple, fh: int, feature_list: list, scaler_type="robust"
+        self, X_shape: tuple, fh: int, feature_list: list, scaler_type="standard"
     ):
         if len(X_shape) > 5:
             (
@@ -56,11 +56,15 @@ class BaselineRegressor:
             print(f"{scaler_type} scaler not implemented")
             raise ValueError
 
-        self.model = DummyRegressor()
+        self.model = DummyRegressor(strategy="constant", constant=0)
         self.models = [copy.deepcopy(self.model) for _ in range(self.num_features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.num_features)]
 
     def train(self, X_train, y_train, normalize=False):
+        if len(str(self.__class__).split(".")) < 4:  # BaselineRegressor
+            y_mean = np.mean(y_train, axis=0)
+            self.model.constant = y_mean
+
         X = X_train.reshape(
             -1,
             self.neighbours
@@ -166,6 +170,10 @@ class BaselineRegressor:
             plt.show()
 
     def predict_(self, X_test, y_test):
+        if len(str(self.__class__).split(".")) < 4:  # BaselineRegressor
+            y_mean = np.tile(self.model.constant, (y_test.shape[0], 1, 1, 1, 1))
+            return y_mean
+
         X = X_test.reshape(
             -1,
             self.neighbours

@@ -4,7 +4,6 @@ import sys
 
 sys.path.append("../..")
 from models.baseline_regressor import BaselineRegressor
-from models.data_processor import DataProcessor
 
 
 def step_split(feature, n_steps=3):

@@ -10,12 +10,12 @@ import numpy as np
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from datetime import datetime, timedelta
 import sys
 sys.path.append("..")
 from model.utils.get_data import DataImporter
 from model.config import config as cfg
-import matplotlib
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -97,7 +97,7 @@ def get_values_by_lat_lng(lat, lng):
     features = {
         "sp": np.array([[[json_data[lat][lng]["sp"][timestamp] for timestamp in json_data[lat][lng]["sp"]] for lng in json_data[lat]] for lat in json_data]),
         "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1 else 0 if json_data[lat][lng]["tcc"][timestamp] < 0 else 1 for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
-        "tp": np.array([[[0 if json_data[lat][lng]["tp"][timestamp] * 1000 < 0.1 else json_data[lat][lng]["tp"][timestamp] * 1000 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
+        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] * 1000 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
         "u10": np.array([[[json_data[lat][lng]["u10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["u10"]] for lng in json_data[lat]] for lat in json_data]),
         "v10": np.array([[[json_data[lat][lng]["v10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["v10"]] for lng in json_data[lat]] for lat in json_data]),
         "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
@@ -127,7 +127,7 @@ def create_maps():
     # Define the latitude and longitude ranges
     features = {
         "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1 else 0 if json_data[lat][lng]["tcc"][timestamp] < 0 else 1 for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
-        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] * 1000 if 0.1 <= json_data[lat][lng]["tp"][timestamp] * 1000 <= 20 else 0 if json_data[lat][lng]["tp"][timestamp] * 1000 < 0.1 else 20 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
+        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] * 1000 if 0.05 <= json_data[lat][lng]["tp"][timestamp] * 1000 <= 100 else 0 if json_data[lat][lng]["tp"][timestamp] * 1000 < 0.05 else 100 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
         "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
     }
 
@@ -139,9 +139,31 @@ def create_maps():
 
     # Define the ranges for the different features
     ranges = {
-        "tp": np.arange(0.1, 20.1, 0.1),
+        "tp": [0.1, 0.25, 0.5, 1, 2.5, 5, 7.5, 10, 15, 20, 30, 40,
+               50, 100],
         "tcc": np.arange(0.01, 1.01, 0.01),
         "t2m": np.arange(t2m_min - 1, t2m_max + 2, 1),
+    }
+
+    custom_colors = [(0.8431372549, 0.91764705882, 0.97647058823),
+                     (0.3137255012989044, 0.8156862854957581,
+                     0.8156862854957581),
+                     (0.0, 1.0, 1.0),
+                     (0.0, 0.8784313797950745, 0.501960813999176),
+                     (0.0, 0.7529411911964417, 0.0),
+                     (0.501960813999176, 0.8784313797950745, 0.0),
+                     (1.0, 1.0, 0.0),
+                     (1.0, 0.6274510025978088, 0.0),
+                     (1.0, 0.0, 0.0),
+                     (1.0, 0.125490203499794, 0.501960813999176),
+                     (0.9411764740943909, 0.250980406999588, 1.0),
+                     (0.501960813999176, 0.125490203499794, 1.0),
+                     (0.250980406999588, 0.250980406999588, 1.0)]
+
+    labels = {
+        "tp" : "[mm]",
+        "tcc" : "[%]",
+        "t2m" : "[°C]"
     }
 
     # Loop through each feature
@@ -163,20 +185,19 @@ def create_maps():
             # gl = ax.gridlines(draw_labels=False, linewidth=1, linestyle="--")
             levels = ranges.get(feature_name)
 
-            # Define the color map for the current feature
+            # Define the color map for the current feature and add a filled contour plot of the data
             if feature_name == "tp":
-                custom_colors = ["#9DADC4", "#08306B"]
-                cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
-                    "custom_cmap", custom_colors)
+                cmap = mcolors.ListedColormap(custom_colors, "custom_cmap")
+                norm = mcolors.BoundaryNorm(ranges["tp"], cmap.N)
+
+                cf = ax.contourf(
+                    lons, lats, data, levels=levels, cmap=cmap, transform=data_crs, norm=norm
+                )
             else:
                 cmap = plt.colormaps[colors.get(feature_name)]
-
-            # Add a filled contour plot of the data
-            cf = ax.contourf(
-                lons, lats, data, levels=levels, cmap=cmap, transform=data_crs
-            )
-            # Add country borders to the map
-            ax.add_feature(cfeature.BORDERS)
+                cf = ax.contourf(
+                    lons, lats, data, levels=levels, cmap=cmap, transform=data_crs
+                )
 
             # Remove axis and labels
             ax.set_axis_off()
@@ -205,24 +226,30 @@ def create_maps():
         if feature_name == "t2m":
             ticks = np.linspace(min_val, max_val, num=(
                 len(ranges[feature_name])))
-        else:
+        elif feature_name == "tcc":
             ticks = np.linspace(min_val, max_val, num=11)
+        else:
+            ticks = ranges["tp"]
 
         # Set the ticks
         cbar.set_ticks(ticks)
 
         if feature_name == "tcc":
-            labels = [f"{int(tick * 100)}%" for tick in ticks]
+            ticklabels = [f"{int(tick * 100)}" for tick in ticks]
+        elif feature_name == "t2m":
+            ticklabels = [f"{int(tick)}" for tick in ticks]
         else:
-            labels = [f"{int(tick)}" for tick in ticks]
-            if feature_name == "tp":
-                labels[-1] = "≥" + str(int(ticks[-1]))
+            ticklabels = [f"{tick}" for tick in ticks]
+            ticklabels[-1] = "≥" + str(int(ticks[-1]))
 
-        # Set the tick labels and increase font size
-        cbar.set_ticklabels(labels, fontsize=32, color='white')
+        # Set the label
+        cbar.set_label(labels[feature_name], fontsize=32, color='white')
+
+        # Set the tick labels
+        cbar.set_ticklabels(ticklabels, fontsize=32, color='white')
 
         # Move the plot around
-        plt.subplots_adjust(left=0.03, right=0.97, top=0.8, bottom=0.2)
+        plt.subplots_adjust(left=0.03, right=0.97, top=0.9, bottom=0.4)
 
         plt.savefig(f"./maps/{feature_name}_legend.png", transparent=True)
 
@@ -263,7 +290,5 @@ async def get_maps():
 # Main function
 if __name__ == "__main__":
     import uvicorn
-
-    create_maps()
 
     uvicorn.run(app, host="0.0.0.0", port=8888)

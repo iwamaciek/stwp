@@ -15,14 +15,80 @@ import sys
 sys.path.append("..")
 from model.utils.get_data import DataImporter
 from model.config import config as cfg
+from model.trainer import Trainer
 import matplotlib
+
+# Function to create new predictions
+def get_current_data():
+    current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
+
+    # This section downloads the data
+    previous_day = current_date - timedelta(days=1)
+    
+    if previous_day.year != current_date.year:
+        dataImporter.query_dict["year"] = [f"{previous_day.year}", f"{current_date.year}"]
+    else:
+        dataImporter.query_dict["year"] = [f"{current_date.year}"]
+    
+    if previous_day.month != current_date.month:
+        dataImporter.query_dict["month"] = [f"{previous_day.month}", f"{current_date.month}"]
+    else:
+        dataImporter.query_dict["month"] = [f"{current_date.month}"]
+
+    if previous_day.day > current_date.day:
+        dataImporter.query_dict["day"] = [f"0{current_date.day}", f"{previous_day.day}"]
+    else:
+        if previous_day.day < 10:
+            previous_day = f"0{previous_day.day}"
+        else:
+            previous_day = f"{previous_day.day}"
+        if current_date.day < 10:
+            current_day = f"0{current_date.day}"
+        else:
+            current_day = f"{current_date.day}"
+        dataImporter.query_dict["day"] = [f"{previous_day}", f"{current_day}"]
+    
+    most_recent_hour = (current_date.hour // 6) * 6
+    dataImporter.query_dict["hour"] = ["00:00", "06:00", "12:00", "18:00"]
+    
+    dataImporter.download_data()
+
+    # This section creates the prediction and saves it into a JSON file
+    trainer = Trainer(architecture="trans", hidden_dim=32)
+    trainer.load_model("../model/data/model-parameters.pt")
+
+    if most_recent_hour == 0:
+        json_data = trainer.predict_to_json(which_sequence=1)
+    elif most_recent_hour == 6:
+        json_data = trainer.predict_to_json(which_sequence=2)
+    elif most_recent_hour == 12:
+        json_data = trainer.predict_to_json(which_sequence=3)
+    elif most_recent_hour == 18:
+        json_data = trainer.predict_to_json(which_sequence=4)
+    else:
+        raise ValueError(f"Hour is incompatible: {most_recent_hour}")
+    
+    current_date = datetime(year=current_date.year, month=current_date.month, day=current_date.day, hour=most_recent_hour)
+
+    return current_date, json_data
+
 
 # Initialize FastAPI app
 app = FastAPI()
 
 # Load JSON data from file
-with open("./data/data.json", "r") as file:
-    json_data = json.load(file)
+# with open("./data/data.json", "r") as file:
+#     json_data = json.load(file)
+
+# Create new data
+dataImporter = DataImporter()
+dataImporter.download_data()
+cfg.DATA_PATH = "../model/data/data.grib"
+cfg.TRAIN_RATIO = 0
+cfg.BATCH_SIZE = 1
+cfg.FH = 5
+cfg.INPUT_SIZE = 5
+previous_data_gather, json_data = get_current_data()
 
 # Get the minimum and maximum latitude and longitude from the data
 lat_min = float(min(json_data.keys()))
@@ -32,13 +98,6 @@ lng_max = float(max(json_data[str(lat_min)].keys()))
 
 # Set the coordinate accuracy
 coord_acc = 0.25
-
-previous_data_gather = datetime.now()
-dataImporter = DataImporter()
-dataImporter.download_data()
-cfg.DATA_PATH = "../model/data/data-example.grib"
-cfg.TRAIN_RATIO = 0
-
 
 # Function to calculate the fractions used for interpolation
 def get_fractions(lat, lng):
@@ -87,7 +146,10 @@ def interpolate_value(array, lat, lng):
 
 
 # Function to get the values for a given latitude and longitude
-def get_values_by_lat_lng(lat, lng):
+def get_values_by_lat_lng(lat, lng, json_input=None):
+    # Make sure the data is correct
+    if json_input is not None:
+        json_data = json_input
 
     # Get all timestamps from the json data
     timestamps = json_data["55.0"]["14.0"]["t2m"].keys()
@@ -119,7 +181,11 @@ def get_values_by_lat_lng(lat, lng):
 
 
 # Function to create maps for different weather features
-def create_maps():
+def create_maps(json_input=None):
+    # Make sure the data is correct
+    if json_input is not None:
+        json_data = json_input
+
     # Define the latitude and longitude ranges
     lats = np.arange(lat_max, lat_min - coord_acc, -coord_acc)
     lons = np.arange(lng_min, lng_max + coord_acc, coord_acc)
@@ -235,18 +301,21 @@ async def get_weather(
     latitude: float = Query(..., description="Latitude of the location"),
     longitude: float = Query(..., description="Longitude of the location"),
 ):
-    if((datetime.now() - previous_data_gather).seconds >= 21600): # 6 hours
+    current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
+    if((current_date - previous_data_gather).seconds >= 21600): # 6 hours
         # Get new data - not implemented yet
-        pass
-    return get_values_by_lat_lng(latitude, longitude)
+        previous_data_gather, json_data = get_current_data()
+    return get_values_by_lat_lng(latitude, longitude, json_data)
 
 
 # Define endpoint for maps
 @app.get("/maps")
 async def get_maps():
-    if((datetime.now() - previous_data_gather).seconds >= 21600): # 6 hours
+    current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
+    if((current_date - previous_data_gather).seconds >= 21600): # 6 hours
         # Get new data - not implemented yet
-        pass
+        previous_data_gather, json_data = get_current_data()
+        create_maps(json_data)
     # Get a list of all files in the "maps" folder
     images = os.listdir("./maps")
 
@@ -258,6 +327,14 @@ async def get_maps():
                 archive.write(full_path, arcname=os.path.join("maps", image))
 
     return FileResponse("./maps.zip", media_type="application/zip")
+
+@app.get("/info")
+async def get_info():
+    info_dict = {
+        "current_data_from": previous_data_gather,
+        "status": "operational",
+    }
+    return info_dict
 
 
 # Main function

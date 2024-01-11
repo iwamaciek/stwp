@@ -363,9 +363,10 @@ class Trainer:
     def get_model(self):
         return self.model
 
-    def predict_to_json(self, X=None, path="../app/data/data.json"):
+    def predict_to_json(self, X=None, path="../app/data/data.json", which_sequence=1):
         if X is None:
-            X = next(iter(self.test_loader))  # batch size should be set to 1 !
+            for i in range(which_sequence):
+                X = next(iter(self.test_loader))  # batch size should be set to 1 !
         _, y_hat = self.inverse_normalization_predict(
             X.x, X.y, X.edge_index, X.edge_attr, X.pos, X.time
         )
@@ -387,3 +388,5 @@ class Trainer:
 
         with open(path, "w") as f:
             json.dump(json_data, f, indent=2, ensure_ascii=False)
+        
+        return json_data

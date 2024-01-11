@@ -1,4 +1,4 @@
-# meteoapp-data
+# stwp - short term weather prediction
 
 ### Install prerequisites:
 ```shell

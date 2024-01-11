@@ -2,11 +2,11 @@ import cfgrib
 import numpy as np
 import copy
 from datetime import datetime
-from utils.datetime_operations import datetime64_to_datetime, get_day_of_year
-from utils.trig_encode import trig_encode
+from model.utils.datetime_operations import datetime64_to_datetime, get_day_of_year
+from model.utils.trig_encode import trig_encode
 from sklearn.utils import shuffle
-from config import config as cfg
-from utils.get_data import BIG_AREA, SMALL_AREA
+from model.config import config as cfg
+from model.utils.get_data import BIG_AREA, SMALL_AREA
 
 
 class DataProcessor:
@@ -37,7 +37,7 @@ class DataProcessor:
         self.data = data
 
     def create_autoregressive_sequences(self, input_size=cfg.INPUT_SIZE, fh=cfg.FH):
-        self.sequence_length = input_size + fh
+        self.sequence_length = input_size
         sequences = np.empty(
             (
                 self.samples - self.sequence_length + 1,
@@ -60,7 +60,7 @@ class DataProcessor:
             )
             for i in range(self.samples - self.sequence_length + 1):
                 time_sequences[i] = self.raw_temporal_data[
-                    i + input_size
+                    i + input_size - 1
                 ]  # Get time for the last timestamp for x
             self.temporal_data = time_sequences
         if self.spatial_encoding:

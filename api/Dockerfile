@@ -14,6 +14,6 @@ COPY ./app/ .
 
 COPY ./model /model
 
-COPY ./.cdsapirc /
+COPY ./.cdsapirc /root/
 
 CMD ["python", "main.py"]

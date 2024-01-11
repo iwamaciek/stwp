@@ -20,6 +20,7 @@ import matplotlib
 
 # Function to create new predictions
 def get_current_data():
+    global json_data
     current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
 
     # This section downloads the data
@@ -55,7 +56,7 @@ def get_current_data():
 
     # This section creates the prediction and saves it into a JSON file
     trainer = Trainer(architecture="trans", hidden_dim=32)
-    trainer.load_model("../model/data/model-parameters.pt")
+    trainer.load_model("../model/data/gnn_fh5.pt")
 
     if most_recent_hour == 0:
         json_data = trainer.predict_to_json(which_sequence=1)
@@ -79,10 +80,10 @@ app = FastAPI()
 # Load JSON data from file
 # with open("./data/data.json", "r") as file:
 #     json_data = json.load(file)
+json_data = None
 
 # Create new data
 dataImporter = DataImporter()
-dataImporter.download_data()
 cfg.DATA_PATH = "../model/data/data.grib"
 cfg.TRAIN_RATIO = 0
 cfg.BATCH_SIZE = 1
@@ -146,10 +147,8 @@ def interpolate_value(array, lat, lng):
 
 
 # Function to get the values for a given latitude and longitude
-def get_values_by_lat_lng(lat, lng, json_input=None):
-    # Make sure the data is correct
-    if json_input is not None:
-        json_data = json_input
+def get_values_by_lat_lng(lat, lng):
+    global json_data
 
     # Get all timestamps from the json data
     timestamps = json_data["55.0"]["14.0"]["t2m"].keys()
@@ -181,10 +180,8 @@ def get_values_by_lat_lng(lat, lng, json_input=None):
 
 
 # Function to create maps for different weather features
-def create_maps(json_input=None):
-    # Make sure the data is correct
-    if json_input is not None:
-        json_data = json_input
+def create_maps():
+    global json_data
 
     # Define the latitude and longitude ranges
     lats = np.arange(lat_max, lat_min - coord_acc, -coord_acc)
@@ -301,21 +298,25 @@ async def get_weather(
     latitude: float = Query(..., description="Latitude of the location"),
     longitude: float = Query(..., description="Longitude of the location"),
 ):
+    global json_data 
+    global previous_data_gather
     current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
-    if((current_date - previous_data_gather).seconds >= 21600): # 6 hours
+    if((current_date - previous_data_gather).seconds > 10): # 6 hours
         # Get new data - not implemented yet
         previous_data_gather, json_data = get_current_data()
-    return get_values_by_lat_lng(latitude, longitude, json_data)
+    return get_values_by_lat_lng(latitude, longitude)
 
 
 # Define endpoint for maps
 @app.get("/maps")
 async def get_maps():
+    global json_data
+    global previous_data_gather
     current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
-    if((current_date - previous_data_gather).seconds >= 21600): # 6 hours
+    if((current_date - previous_data_gather).seconds > 10): # 6 hours
         # Get new data - not implemented yet
         previous_data_gather, json_data = get_current_data()
-        create_maps(json_data)
+        create_maps()
     # Get a list of all files in the "maps" folder
     images = os.listdir("./maps")
 

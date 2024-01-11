@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from torch_geometric.nn.conv import TransformerConv
-from config import config as cfg
-from st_encoder_module import SpatioTemporalEncoder
+from model.config import config as cfg
+from model.st_encoder_module import SpatioTemporalEncoder
 
 N = 5
 

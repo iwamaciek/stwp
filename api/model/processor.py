@@ -11,9 +11,9 @@ from sklearn.preprocessing import (
     MaxAbsScaler,
 )
 from sklearn.utils import shuffle
-from config import config as cfg
+from model.config import config as cfg
 
-from data_processor import DataProcessor
+from model.data_processor import DataProcessor
 
 
 class NNDataProcessor:
@@ -120,22 +120,22 @@ class NNDataProcessor:
             y_train_i = y_train[..., i].reshape(-1, 1)
             y_test_i = y_test[..., i].reshape(-1, 1)
 
-            self.scalers[i].fit(X_train_i)
-            X_train[..., i] = (
-                self.scalers[i]
-                .transform(X_train_i)
-                .reshape((self.train_size, Xi_shape))
-            )
+            self.scalers[i].fit(X_test_i)
+            # X_train[..., i] = (
+            #     self.scalers[i]
+            #     .transform(X_train_i)
+            #     .reshape((self.train_size, Xi_shape))
+            # )
             X_test[..., i] = (
                 self.scalers[i]
                 .transform(X_test_i)
                 .reshape((self.test_size + self.val_size, Xi_shape))
             )
-            y_train[..., i] = (
-                self.scalers[i]
-                .transform(y_train_i)
-                .reshape((self.train_size, yi_shape))
-            )
+            # y_train[..., i] = (
+            #     self.scalers[i]
+            #     .transform(y_train_i)
+            #     .reshape((self.train_size, yi_shape))
+            # )
             y_test[..., i] = (
                 self.scalers[i]
                 .transform(y_test_i)

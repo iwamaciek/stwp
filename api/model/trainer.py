@@ -6,16 +6,16 @@ import cartopy.crs as ccrs
 import json
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from processor import NNDataProcessor
-from data_processor import DataProcessor
-from config import config as cfg
-from callbacks import (
+from model.processor import NNDataProcessor
+from model.data_processor import DataProcessor
+from model.config import config as cfg
+from model.callbacks import (
     LRAdjustCallback,
     CkptCallback,
     EarlyStoppingCallback,
 )
-from transformer_conv import TransformerGNN
-from utils.draw_functions import draw_poland
+from model.transformer_conv import TransformerGNN
+from model.utils.draw_functions import draw_poland
 
 
 class Trainer:
@@ -122,7 +122,7 @@ class Trainer:
         self.ckpt_callback = CkptCallback(self.model)
 
     def load_model(self, path):
-        self.model.load_state_dict(torch.load(path))#, map_location=torch.device('cpu')
+        self.model.load_state_dict(torch.load(path, map_location=torch.device('cpu')))#
 
     def train(self, num_epochs=50):
         # gradient_clip = 32
@@ -378,13 +378,13 @@ class Trainer:
         json_data = {}
 
         for i, lat in enumerate(lat_span):
-            json_data[lat] = {}
+            json_data[str(lat)] = {}
             for j, lon in enumerate(lon_span):
-                json_data[lat][lon] = {}
+                json_data[str(lat)][str(lon)] = {}
                 for k, feature in enumerate(self.feature_list):
-                    json_data[lat][lon][feature] = {}
+                    json_data[str(lat)][str(lon)][feature] = {}
                     for ts in range(y_hat.shape[-1]):
-                        json_data[lat][lon][feature][ts] = float(y_hat[i, j, k, ts])
+                        json_data[str(lat)][str(lon)][feature][ts] = float(y_hat[i, j, k, ts])
 
         with open(path, "w") as f:
             json.dump(json_data, f, indent=2, ensure_ascii=False)

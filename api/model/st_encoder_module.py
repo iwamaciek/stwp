@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from config import config as cfg
+from model.config import config as cfg
 
 
 class SpatioTemporalEncoder(nn.Module):

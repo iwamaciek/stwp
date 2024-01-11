@@ -3,6 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import time
 import cartopy.crs as ccrs
+import json
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from models.gnn.processor import NNDataProcessor
@@ -373,3 +374,28 @@ class Trainer:
 
     def get_model(self):
         return self.model
+    
+    def predict_to_json(self, X=None, path="../data.json"):
+        if X is None:
+            X = next(iter(self.test_loader))  # batch size should be set to 1 !
+        _, y_hat = self.inverse_normalization_predict(
+            X.x, X.y, X.edge_index, X.edge_attr, X.pos, X.time
+        )
+        y_hat = y_hat.reshape((self.latitude, self.longitude, self.features, -1))
+        lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
+        lat_span = list(lat_span[:, 0])
+        lon_span = list(lon_span[0, :])
+
+        json_data = {}
+
+        for i, lat in enumerate(lat_span):
+            json_data[lat] = {}
+            for j, lon in enumerate(lon_span):
+                json_data[lat][lon] = {}
+                for k, feature in enumerate(self.feature_list):
+                    json_data[lat][lon][feature] = {}
+                    for ts in range(y_hat.shape[-1]):
+                        json_data[lat][lon][feature][ts] = float(y_hat[i, j, k, ts])
+
+        with open(path, "w") as f:
+            json.dump(json_data, f, indent=2, ensure_ascii=False)

@@ -10,8 +10,6 @@ COPY script.sh .
 
 RUN ./script.sh
 
-RUN apt install libeccodes-dev -y
-
 COPY ./app/ .
 
 COPY ./model /model

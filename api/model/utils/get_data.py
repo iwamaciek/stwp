@@ -8,7 +8,7 @@ class DataImporter():
 
 
         self.dataset = "reanalysis-era5-single-levels"
-        self.path = "../model/data/data-example.grib"
+        self.path = "../model/data/data.grib"
 
         self.query_dict = {
             "product_type": "reanalysis",

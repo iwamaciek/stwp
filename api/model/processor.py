@@ -229,7 +229,8 @@ class NNDataProcessor:
         # random state for reproduction
         train_dataset = shuffle(train_dataset, random_state=self.cfg.RANDOM_STATE)
         val_dataset = shuffle(val_dataset, random_state=self.cfg.RANDOM_STATE)
-        test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
+        # test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
+        # DO NOT SHUFFLE!!! THIS IS FOR easier evaluation and result presentation
 
         if subset is not None:
             train_dataset = train_dataset[: subset * self.cfg.BATCH_SIZE]

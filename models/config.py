@@ -6,8 +6,10 @@ class Config:
     TRAIN_RATIO = 1 / 3
     BATCH_SIZE = 8
     FH = 1
+    # AUTOREG_FH = None
     INPUT_SIZE = 5
     R = 2
+    GRAPH_CELLS = 5
     SCALER_TYPE = "standard"
     DATA_PATH = "../../data2019-2021_BIG.grib"
     RANDOM_STATE = 42

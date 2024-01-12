@@ -13,11 +13,7 @@ from models.gnn.callbacks import (
     CkptCallback,
     EarlyStoppingCallback,
 )
-from models.gnn.cgc_conv import CrystalGNN
-from models.gnn.transformer_conv import TransformerGNN
-from models.gnn.gat_conv import GATConvNN
-from models.gnn.gen_conv import GENConvNN
-from models.gnn.pdn_conv import PDNConvNN
+from models.gnn.gnn_module import GNNModule
 from utils.draw_functions import draw_poland
 from datetime import datetime
 
@@ -103,6 +99,7 @@ class Trainer:
 
     def init_architecture(self):
         init_dict = {
+            "arch": self.architecture,
             "input_features": self.features,
             "output_features": self.features,
             "edge_dim": self.edge_attr.size(-1),
@@ -111,22 +108,10 @@ class Trainer:
             "input_s_dim": self.nn_proc.num_spatial_constants,
             "input_size": self.cfg.INPUT_SIZE,
             "fh": self.cfg.FH,
+            "num_graph_cells": self.cfg.GRAPH_CELLS,
         }
-
-        if self.architecture == "cgcn":
-            self.model = CrystalGNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "trans":
-            self.model = TransformerGNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "gat":
-            self.model = GATConvNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "gen":
-            self.model = GENConvNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "pdn":
-            self.model = PDNConvNN(**init_dict).to(self.cfg.DEVICE)
-        else:
-            self.model = None
-            print(f"Architecture {self.architecture} not implemented")
-            raise NotImplemented
+        self.model = GNNModule(**init_dict).to(self.cfg.DEVICE)
+        # self.model = torch.compile(self.model)
 
     def init_train_details(self):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -243,7 +228,8 @@ class Trainer:
                     y_hat[j, ..., i, :] = (
                         self.scalers[i].inverse_transform(yhat_i).reshape(y_shape)
                     )
-
+        if inverse_norm:
+            y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat
 
     def plot_predictions(self, data_type="test", pretty=False):
@@ -353,6 +339,88 @@ class Trainer:
 
         return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
 
+    def autoreg_evaluate(self, data_type="test", fh=2, verbose=True, inverse_norm=True):
+        # Only works for fh=1 for now
+        self.cfg.BATCH_SIZE = 1
+        self.cfg.FH = fh
+        self.update_data_process()
+        self.cfg.FH = 1
+
+        if data_type == "train":
+            loader = self.train_loader
+        elif data_type == "test":
+            loader = self.test_loader
+        elif data_type == "val":
+            loader = self.val_loader
+        else:
+            print("Invalid type: (train, test, val)")
+            raise ValueError
+
+        y = torch.empty((0, self.latitude, self.longitude, self.features, fh)).to(
+            self.cfg.DEVICE
+        )
+        y_hat = torch.empty((0, self.latitude, self.longitude, self.features, fh)).to(
+            self.cfg.DEVICE
+        )
+        y_shape = (self.latitude * self.longitude, self.features, 1)
+        for batch in loader:
+            y_hat_autoreg_i = torch.zeros_like(batch.y)
+            y_i = torch.zeros_like(batch.y)
+            for t in range(fh):
+                input_batch = batch.clone()
+                input_batch.y = input_batch.y[..., t : t + 1]
+                if t == 0:
+                    y_it, y_hat_it = self.predict(
+                        input_batch.x,
+                        input_batch.y,
+                        input_batch.edge_index,
+                        input_batch.edge_attr,
+                        input_batch.pos,
+                        input_batch.time,
+                        inverse_norm=inverse_norm,
+                    )
+                else:
+                    input_batch.x = torch.cat(
+                        (input_batch.x[..., :-t], y_hat_autoreg_i[..., :t]), dim=-1
+                    )
+                    y_it, y_hat_it = self.predict(
+                        input_batch.x,
+                        input_batch.y,
+                        input_batch.edge_index,
+                        input_batch.edge_attr,
+                        input_batch.pos,
+                        input_batch.time,
+                        inverse_norm=inverse_norm,
+                    )
+                y_hat_i = torch.from_numpy(y_hat_it).to(self.cfg.DEVICE)
+                y_it = torch.from_numpy(y_it).to(self.cfg.DEVICE)
+                y_hat_autoreg_i[..., t : t + 1] = y_hat_i.reshape(y_shape)
+                y_i[..., t : t + 1] = y_it.reshape(y_shape)
+
+            y = torch.cat(
+                (y, y_i.reshape(1, self.latitude, self.longitude, self.features, fh)),
+                dim=0,
+            )
+            y_hat = torch.cat(
+                (
+                    y_hat,
+                    y_hat_autoreg_i.reshape(
+                        1, self.latitude, self.longitude, self.features, fh
+                    ),
+                ),
+                dim=0,
+            )
+
+        y_hat = y_hat.cpu().detach().numpy()
+        y = y.cpu().detach().numpy()
+
+        if self.spatial_mapping:
+            y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
+            y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
+
+        self.cfg.FH = 1
+        return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
+
     def calculate_metrics(self, y_hat, y, verbose=False):
         rmse_features = []
         mae_features = []
@@ -380,3 +448,8 @@ class Trainer:
             t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             path = f"../data/pred/{self.architecture}_{t}.npy"
         np.save(path, y_hat)
+
+    @staticmethod
+    def clip_total_cloud_cover(y_hat, idx=2):
+        y_hat[..., idx, :] = np.clip(y_hat[..., idx, :], 0, 1)
+        return y_hat

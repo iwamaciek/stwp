@@ -20,7 +20,6 @@ class GradBooster(BaselineRegressor):
             self.model = AdaBoostRegressor(**kwargs)
         else:
             print(f"{booster} booster not implemented")
-
             raise ValueError
 
         self.models = [copy.deepcopy(self.model) for _ in range(self.num_features)]

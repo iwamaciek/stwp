@@ -201,7 +201,8 @@ class Trainer(GNNTrainer):
                 y_hat[j, ..., i, :] = (
                     self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
                 )
-
+        if inverse_norm:
+            y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat
 
     def save_prediction_tensor(self, y_hat, path=None):

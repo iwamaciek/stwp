@@ -104,12 +104,10 @@ class SimpleLinearRegressor(BaselineRegressor):
         return y_hat
 
     def extend(self, Y):
-        # TODO function that maps no. of neighbours -> radius
         if self.neighbours <= 5:
             radius = 1
         elif self.neighbours <= 13:
             radius = 2
-        # ...
         else:
             radius = 3
 

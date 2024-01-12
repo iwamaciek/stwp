@@ -16,6 +16,8 @@ from model.callbacks import (
 )
 from model.transformer_conv import TransformerGNN
 from model.utils.draw_functions import draw_poland
+from model.utils.trig_encode import trig_decode
+from datetime import datetime, timedelta
 
 
 class Trainer:
@@ -377,6 +379,11 @@ class Trainer:
 
         json_data = {}
 
+        prediction_time = X.time
+        prediction_day = trig_decode(prediction_time[0].item(), prediction_time[1].item(), 365)
+        prediction_hour = trig_decode(prediction_time[2].item(), prediction_time[3].item(), 24)
+        prediction_date = datetime(year=2024, month=1, day=1, hour=prediction_hour) + timedelta(days=prediction_day-1)
+
         for i, lat in enumerate(lat_span):
             json_data[str(lat)] = {}
             for j, lon in enumerate(lon_span):
@@ -384,7 +391,8 @@ class Trainer:
                 for k, feature in enumerate(self.feature_list):
                     json_data[str(lat)][str(lon)][feature] = {}
                     for ts in range(y_hat.shape[-1]):
-                        json_data[str(lat)][str(lon)][feature][ts] = float(y_hat[i, j, k, ts])
+                        t = prediction_date + timedelta(hours=6)
+                        json_data[str(lat)][str(lon)][feature][t.strftime("%Y-%m-%dT%H:%M:%S")] = float(y_hat[i, j, k, ts])
 
         with open(path, "w") as f:
             json.dump(json_data, f, indent=2, ensure_ascii=False)

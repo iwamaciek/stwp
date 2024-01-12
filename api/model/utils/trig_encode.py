@@ -21,4 +21,4 @@ def trig_decode(vsin, vcos, norm_v):
     va = np.round(va, 5)
     vb = np.round(vb, 5)
     v = np.intersect1d(va, vb)[0]
-    return np.round(v * norm_v / (2*np.pi), 0)
+    return int(np.round(v * norm_v / (2*np.pi), 0))

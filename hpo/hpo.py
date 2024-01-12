@@ -163,6 +163,12 @@ class HPO:
             best_s = 0
             max_rmse = np.inf
 
+
+            if self.baseline_type == 'gnn':
+                trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
+            elif self.baseline_type == 'cnn':
+                trainer = CNNTrainer(subset=self.subset)
+
             for s in range(1, self.sequence_n_trials + 1):
                 # processor = DataProcessor(self.data)
                 self.processor.upload_data(self.data)
@@ -205,7 +211,7 @@ class HPO:
                     rmse_not_normalized = regressor.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "gnn":
-                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
+                    
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
@@ -216,7 +222,7 @@ class HPO:
 
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer(subset=self.subset)
+                    
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
@@ -375,6 +381,11 @@ class HPO:
             best_fh = 0
             max_rmse = np.inf
 
+            if self.baseline_type == 'gnn':
+                trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
+            elif self.baseline_type == 'cnn':
+                trainer = CNNTrainer(subset=self.subset)
+
             for fh in range(1, self.fh_n_trials + 1):
                 # processor = DataProcessor(self.data)
                 self.processor.upload_data(self.data)
@@ -416,17 +427,17 @@ class HPO:
                     rmse_not_normalized = regressor.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "gnn":
-                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
                     rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    # rmse_values, _ = trainer.autoreg_evaluate("test", fh=fh, verbose=False)                    
                     rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer(subset=self.subset)
+                    # trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)

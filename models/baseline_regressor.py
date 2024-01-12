@@ -303,3 +303,4 @@ class BaselineRegressor:
             name = str(self.__class__).split(".")[-2]
             path = f"../data/pred/{name}_{t}.npy"
         np.save(path, y_hat)
+        # y_loaded  = np.load(path)

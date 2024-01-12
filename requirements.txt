@@ -22,3 +22,5 @@ pygrib
 catboost
 fastapi
 uvicorn
+seaborn
+tabulate

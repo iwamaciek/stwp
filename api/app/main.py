@@ -329,7 +329,7 @@ async def get_weather(
     global json_data 
     global previous_data_gather
     current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
-    if((current_date - previous_data_gather).seconds > 10): # 6 hours
+    if((current_date - previous_data_gather).seconds > 21600): # 6 hours
         # Get new data - not implemented yet
         previous_data_gather, json_data = get_current_data()
     return get_values_by_lat_lng(latitude, longitude)
@@ -341,7 +341,7 @@ async def get_maps():
     global json_data
     global previous_data_gather
     current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
-    if((current_date - previous_data_gather).seconds > 10): # 6 hours
+    if((current_date - previous_data_gather).seconds > 21600): # 6 hours
         # Get new data - not implemented yet
         previous_data_gather, json_data = get_current_data()
         create_maps()

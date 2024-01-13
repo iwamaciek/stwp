@@ -169,15 +169,41 @@ class Visualization:
 
             # Iterate over each baseline_type and plot the data
             for baseline_type in self.plots_data.keys():
-                # Get the sequence_plot_x and sequence_plot_time for the current baseline_type
-                sequence_plot_x = self.plots_data[baseline_type]["sequence_plot_x"]
-                sequence_plot_time = self.plots_data[baseline_type]["sequence_plot_time"]
 
-                # Plot the data on the single plot
-                ax.plot( sequence_plot_x, sequence_plot_time, label=baseline_type)
+                if baseline_type in ['simple-linear', 'linear', 'lgbm']:
+                    # Get the sequence_plot_x and sequence_plot_time for the current baseline_type
+                    sequence_plot_x = self.plots_data[baseline_type]["sequence_plot_x"]
+                    sequence_plot_time = self.plots_data[baseline_type]["sequence_plot_time"]
+
+                    # Plot the data on the single plot
+                    ax.plot( sequence_plot_x, sequence_plot_time, label=baseline_type)
 
             # Set the title and legend
-            ax.set_title("Data Sequence Time")
+            ax.set_title("Data Sequence Time (Baselines)")
+            ax.legend()
+            ax.set_xlabel("Sequence Length")
+            ax.set_ylabel("Time [s]")
+
+            # Show the plot
+            plt.show()
+
+
+            # Create a single plot with multiple lines and legend
+            fig, ax = plt.subplots(figsize=(10, 8))
+
+            # Iterate over each baseline_type and plot the data
+            for baseline_type in self.plots_data.keys():
+
+                if baseline_type in ['gnn', 'cnn']:
+                    # Get the sequence_plot_x and sequence_plot_time for the current baseline_type
+                    sequence_plot_x = self.plots_data[baseline_type]["sequence_plot_x"]
+                    sequence_plot_time = self.plots_data[baseline_type]["sequence_plot_time"]
+
+                    # Plot the data on the single plot
+                    ax.plot( sequence_plot_x, sequence_plot_time, label=baseline_type)
+
+            # Set the title and legend
+            ax.set_title("Data Sequence Time (Nets)")
             ax.legend()
             ax.set_xlabel("Sequence Length")
             ax.set_ylabel("Time [s]")

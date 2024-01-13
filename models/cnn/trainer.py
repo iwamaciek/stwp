@@ -47,7 +47,7 @@ class Trainer(GNNTrainer):
         self.optimizer = None
         self.lr_callback = None
         self.ckpt_callback = None
-        self.early_stop_callback = EarlyStoppingCallback()
+        self.early_stop_callback = None
         self.init_train_details()
 
     def init_architecture(self):

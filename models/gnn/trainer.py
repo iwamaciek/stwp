@@ -62,7 +62,7 @@ class Trainer:
         self.optimizer = None
         self.lr_callback = None
         self.ckpt_callback = None
-        self.early_stop_callback = EarlyStoppingCallback()
+        self.early_stop_callback = None
         self.init_train_details()
 
     def update_config(self, c):
@@ -117,6 +117,7 @@ class Trainer:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
+        self.early_stop_callback = EarlyStoppingCallback()
 
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path))
@@ -307,7 +308,7 @@ class Trainer:
 
         self.calculate_metrics(y_hat, y)
 
-    def evaluate(self, data_type="test", verbose=True, inverse_norm=True):
+    def evaluate(self, data_type="test", verbose=True, inverse_norm=True, begin=None, end=None):
         if data_type == "train":
             loader = self.train_loader
         elif data_type == "test":
@@ -321,6 +322,15 @@ class Trainer:
         y = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         for batch in loader:
+            
+            if begin is not None and end is not None:
+                v_sin = batch.time[0].item()
+                v_cos = batch.time[1].item()
+                ts = np.arctan2(v_sin, v_cos) / (2 * np.pi) * 365
+                if begin > ts:
+                    continue
+                elif end < ts:
+                    break
             y_i, y_hat_i = self.predict(
                 batch.x,
                 batch.y,

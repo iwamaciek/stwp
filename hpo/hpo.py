@@ -119,6 +119,7 @@ class HPO:
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "linear":
                 linearreg = LinearRegressor(
@@ -131,12 +132,14 @@ class HPO:
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "lgbm":
                 regressor = GradBooster(X.shape, self.fh, self.feature_list)
                 regressor.train(X_train, y_train, normalize=True)
                 y_hat = regressor.predict_(X_test, y_test)
                 rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+
                 mean_rmse = np.mean(rmse_values)
             else:
                 raise InvalidBaselineException
@@ -186,6 +189,7 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                     rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
                     print(rmse_not_normalized)
                     mean_rmse = np.mean(rmse_values)
@@ -201,6 +205,7 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+     
                     rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "lgbm":
@@ -208,6 +213,7 @@ class HPO:
                     regressor.train(X_train, y_train, normalize=True)
                     y_hat = regressor.predict_(X_test, y_test)
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+ 
                     rmse_not_normalized = regressor.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "gnn":
@@ -216,8 +222,9 @@ class HPO:
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
-                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values = rmse_values[0]
+                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
                     rmse_not_normalized = rmse_not_normalized[0]
 
                     mean_rmse = np.mean(rmse_values)
@@ -227,8 +234,9 @@ class HPO:
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
-                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values = rmse_values[0]
+                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
                 else:
@@ -343,6 +351,7 @@ class HPO:
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "linear":
                 linearreg = LinearRegressor(
@@ -351,12 +360,14 @@ class HPO:
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                 mean_rmse = np.mean(rmse_values)
             elif self.baseline_type == "lgbm":
                 regressor = GradBooster(X.shape, fh, self.feature_list, **self.params)
                 regressor.train(X_train, y_train, normalize=True)
                 y_hat = regressor.predict_(X_test, y_test)
                 rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+ 
                 mean_rmse = np.mean(rmse_values)
             else:
                 raise InvalidBaselineException
@@ -403,6 +414,7 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                     rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
                     mean_rmse = np.mean(rmse_values)
 
@@ -431,9 +443,10 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values = rmse_values[0]
                     # rmse_values, _ = trainer.autoreg_evaluate("test", fh=fh, verbose=False)                    
-                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
@@ -442,8 +455,9 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
-                    rmse_not_normalized, _ = trainer.evaluate("test", inverse_norm=False, verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values = rmse_values[0]
+                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
                 else:
@@ -584,16 +598,18 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
                     rmse_values = rmse_values[0]
+    
             elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
                     rmse_values = rmse_values[0]
+
             else:
                 raise InvalidBaselineException
 
@@ -661,6 +677,7 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                     mean_rmse = np.mean(rmse_values)
 
                 elif self.baseline_type == "linear":
@@ -675,12 +692,14 @@ class HPO:
                     linearreg.train(X_train, y_train, normalize=True)
                     y_hat = linearreg.predict_(X_test, y_test)
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "lgbm":
                     regressor = GradBooster(X.shape, self.best_fhfh, self.feature_list, scaler_type=scaler)
                     regressor.train(X_train, y_train, normalize=True)
                     y_hat = regressor.predict_(X_test, y_test)
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+    
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "gnn":
                     trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
@@ -689,7 +708,8 @@ class HPO:
                     cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
@@ -698,7 +718,8 @@ class HPO:
                     cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                 else:
                     raise InvalidBaselineException

@@ -3,7 +3,7 @@ import cdsapi
 c = cdsapi.Client()
 
 dataset = "reanalysis-era5-single-levels"
-path = "../data2019-2021_BIG.grib"
+path = "../data2019-2021_SMALL.grib"
 
 BIG_AREA = [55.75, 13.25, 48, 25]  # for nn
 SMALL_AREA = [55, 14, 49, 25]
@@ -78,7 +78,7 @@ query_dict = {
         "12:00",
         "18:00",
     ],
-    "area": BIG_AREA,
+    "area": SMALL_AREA,
 }
 
 

@@ -49,3 +49,12 @@ class Analyzer:
     def calculate_corr_matrix(self):
         # TODO
         pass
+
+    def extract_seasons(self):
+        pass
+        # month = y_hat.shape[0] // 12
+        # winter = np.concatenate((y_hat[:2 * month], y_hat[-month:]), axis=0)
+        # spring = y_hat[2 * month:5 * month]
+        # summer = y_hat[5 * month:8 * month]
+        # autumn = y_hat[8 * month:11 * month]
+        # return winter, spring, summer, autumn

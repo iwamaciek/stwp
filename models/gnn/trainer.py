@@ -114,7 +114,9 @@ class Trainer:
         # self.model = torch.compile(self.model)
 
     def init_train_details(self):
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.lr, weight_decay=1e-4
+        )
         self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
 

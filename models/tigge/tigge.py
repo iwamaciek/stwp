@@ -48,7 +48,6 @@ def load_tigge_0_to_12_by_6(grib_file):
             u10_step_12,
             v10_step_12,
             tp_step_12,
-            sp_step_12,
         ),
         axis=-1,
     )

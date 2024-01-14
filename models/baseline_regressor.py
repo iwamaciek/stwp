@@ -77,7 +77,7 @@ class BaselineRegressor:
                 self.scalers[i].fit(yi)
             self.models[i].fit(X, yi)
 
-    def get_rmse(self, y_hat, y_test, normalize=False):
+    def get_rmse(self, y_hat, y_test, normalize=False, begin=None, end=None):
         rmse_features = []
         for i in range(self.num_features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
@@ -85,6 +85,10 @@ class BaselineRegressor:
             if normalize:
                 y_test_i = self.scalers[i].transform(y_test_i)
                 y_hat_i = self.scalers[i].transform(y_hat_i)
+
+            if begin is not None and end is not None:
+                y_hat_i = y_hat_i[begin:end]
+                y_test_i = y_test_i[begin:end]
             err = np.sqrt(mean_squared_error(y_hat_i, y_test_i))
             rmse_features.append(err)
         return rmse_features

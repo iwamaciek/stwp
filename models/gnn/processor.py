@@ -23,6 +23,7 @@ class NNDataProcessor:
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        test_shuffle=True,
     ):
         self.data_proc = DataProcessor(
             spatial_encoding=spatial_encoding,
@@ -48,6 +49,7 @@ class NNDataProcessor:
         self.train_loader = None
         self.val_loader = None
         self.test_loader = None
+        self.test_shuffle = test_shuffle
 
         self.train_size = None
         self.val_size = None
@@ -70,7 +72,7 @@ class NNDataProcessor:
             X_train, X_test, y_train, y_test, scaler_type=self.cfg.SCALER_TYPE
         )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
-            X, y, subset
+            X, y, subset, self.test_shuffle
         )
 
     def train_val_test_split(self):
@@ -233,7 +235,7 @@ class NNDataProcessor:
 
         return edge_index, edge_weights, edge_attr
 
-    def get_loaders(self, X, y, subset=None):
+    def get_loaders(self, X, y, subset=None, test_shuffle=True):
         dataset = []
         for i in range(X.shape[0]):
             Xi = torch.from_numpy(X[i].astype("float32")).to(self.cfg.DEVICE)
@@ -267,7 +269,8 @@ class NNDataProcessor:
         # random state for reproduction
         train_dataset = shuffle(train_dataset, random_state=self.cfg.RANDOM_STATE)
         val_dataset = shuffle(val_dataset, random_state=self.cfg.RANDOM_STATE)
-        # test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
+        if test_shuffle:
+            test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
 
         if subset is not None:
             train_dataset = train_dataset[: subset * self.cfg.BATCH_SIZE]

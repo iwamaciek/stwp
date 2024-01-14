@@ -28,6 +28,7 @@ class Trainer:
         subset=None,
         spatial_mapping=True,
         additional_encodings=True,
+        test_shuffle=True,
     ):
         self.train_loader = None
         self.val_loader = None
@@ -46,7 +47,7 @@ class Trainer:
         self.subset = subset
 
         self.cfg = cfg
-        self.nn_proc = NNDataProcessor(additional_encodings=additional_encodings)
+        self.nn_proc = NNDataProcessor(additional_encodings=additional_encodings, test_shuffle=test_shuffle)
         self.init_data_process()
 
         self.model = None
@@ -122,7 +123,7 @@ class Trainer:
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path))
 
-    def train(self, num_epochs=50):
+    def train(self, num_epochs=50, verbose=False):
         # gradient_clip = 32
         start = time.time()
 
@@ -155,10 +156,11 @@ class Trainer:
             avg_loss = total_loss / (self.subset * self.cfg.BATCH_SIZE)
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
-
-            print(
-                f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.5f}, lr: {last_lr}"
-            )
+            
+            if verbose:
+                print(
+                    f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.5f}, lr: {last_lr}"
+                )
 
             self.model.eval()
             with torch.no_grad():
@@ -185,7 +187,8 @@ class Trainer:
             )
             val_loss_list.append(avg_val_loss)
 
-            print(f"Val Loss: {avg_val_loss:.5f}\n---------")
+            if verbose:
+                print(f"Val Loss: {avg_val_loss:.5f}\n---------")
 
             self.lr_callback.step(avg_val_loss)
             self.ckpt_callback.step(avg_val_loss)
@@ -194,8 +197,9 @@ class Trainer:
                 break
 
         end = time.time()
-        print(f"{end - start} [s]")
-        self.plot_loss(val_loss_list, train_loss_list)
+        if verbose:
+            print(f"{end - start} [s]")
+            self.plot_loss(val_loss_list, train_loss_list)
 
     @staticmethod
     def plot_loss(val_loss_list, train_loss_list):
@@ -321,15 +325,18 @@ class Trainer:
 
         y = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
-        for batch in loader:
-            
+        for i, batch in enumerate(loader):
+            print(i)
             if begin is not None and end is not None:
                 v_sin = batch.time[0].item()
                 v_cos = batch.time[1].item()
                 ts = np.arctan2(v_sin, v_cos) / (2 * np.pi) * 365
+                print(f"ts: {ts}, begin: {begin}, end: {end}")
                 if begin > ts:
+                    print("continue")
                     continue
                 elif end < ts:
+                    print("break")
                     break
             y_i, y_hat_i = self.predict(
                 batch.x,
@@ -346,6 +353,9 @@ class Trainer:
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
+        
+        print(y_hat.shape)
+        print(y_hat)
 
         return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
 

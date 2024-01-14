@@ -12,11 +12,13 @@ class CNNDataProcessor(NNDataProcessor):
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        test_shuffle=True,
     ) -> None:
         super().__init__(
             spatial_encoding=spatial_encoding,
             temporal_encoding=temporal_encoding,
             additional_encodings=additional_encodings,
+            test_shuffle=test_shuffle,
         )
 
     def preprocess(self, subset=None):

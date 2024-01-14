@@ -15,7 +15,7 @@ from datetime import datetime
 
 class Trainer(GNNTrainer):
     def __init__(
-        self, base_units=16, lr=0.001, gamma=0.5, subset=None, spatial_mapping=True
+        self, base_units=16, lr=0.001, gamma=0.5, subset=None, spatial_mapping=True, test_shuffle=True
     ) -> None:
         self.train_loader = None
         self.val_loader = None
@@ -34,7 +34,7 @@ class Trainer(GNNTrainer):
         self.subset = subset
 
         self.cfg = cfg
-        self.nn_proc = CNNDataProcessor(additional_encodings=True)
+        self.nn_proc = CNNDataProcessor(additional_encodings=True, test_shuffle=test_shuffle)
         self.init_data_process()
 
         self.model = None

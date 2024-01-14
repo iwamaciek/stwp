@@ -21,6 +21,8 @@ from models.gnn.trainer import Trainer
 from models.cnn.trainer import Trainer as CNNTrainer
 from models.config import config as cfg
 
+from utils.progress_bar import printProgressBar
+
 
 class InvalidBaselineException(Exception):
     "Raised when baseline type in invalid"
@@ -85,6 +87,9 @@ class HPO:
 
         self.not_normalized_plot_sequence = {}
         self.not_normalized_plot_fh = {}
+
+
+        self.month_error = {}
 
     def run_hpo(self):
         return -1
@@ -165,6 +170,8 @@ class HPO:
             self.clear_sequence_plot()
             best_s = 0
             max_rmse = np.inf
+
+            printProgressBar(0, self.sequence_n_trials + 1, prefix = ' Sequence Progress:', suffix = 'Complete', length = 50)
 
 
             if self.baseline_type == 'gnn':
@@ -255,6 +262,8 @@ class HPO:
                 if mean_rmse < max_rmse:
                     max_rmse = mean_rmse
                     best_s = s
+
+                printProgressBar(s, self.sequence_n_trials + 1, prefix = 'Sequence Progress:', suffix = 'Complete', length = 50)
 
             self.best_s = best_s
 
@@ -391,6 +400,7 @@ class HPO:
             self.clear_fh_plot()
             best_fh = 0
             max_rmse = np.inf
+            printProgressBar(0, self.sequence_n_trials + 1, prefix = ' Forcasting Horizon Progress:', suffix = 'Complete', length = 50)
 
             if self.baseline_type == 'gnn':
                 trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
@@ -476,6 +486,8 @@ class HPO:
                 if mean_rmse < max_rmse:
                     max_rmse = mean_rmse
                     best_fh = fh
+
+                printProgressBar(fh, self.fh_n_trials + 1, prefix = 'Forcasting Horizon Progress:', suffix = 'Complete', length = 50)
 
             self.best_fh = best_fh
 
@@ -649,6 +661,7 @@ class HPO:
             "metrics_for_scalers": self.metrics_for_scalers,
             "not_normalized_plot_sequence": self.not_normalized_plot_sequence,
             "not_normalized_plot_fh": self.not_normalized_plot_fh,
+            "month_error": self.month_error 
         }
 
         # Write data to file
@@ -740,3 +753,110 @@ class HPO:
                 "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
             )   
 
+    def monthly_error(self):
+        try:
+            months_days = {
+                1: (1, 31),
+                2: (32, 59),
+                3: (60, 90),
+                4: (91, 120),
+                5: (121, 151),
+                6: (152, 181),
+                7: (182, 212),
+                8: (213, 243),
+                9: (244, 273),
+                10: (274, 304),
+                11: (305, 334),
+                12: (335, 365),
+            }
+
+            months_names = {
+                1: "January",
+                2: "February",
+                3: "March",
+                4: "April",
+                5: "May",
+                6: "June",
+                7: "July",
+                8: "August",
+                9: "September",
+                10: "October",
+                11: "November",
+                12: "December",
+            }
+
+
+            if self.baseline_type == 'gnn':
+                    trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset, test_shuffle=False)
+            elif self.baseline_type == 'cnn':
+                trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
+
+
+            for month in range(1, 13):
+                self.processor.upload_data(self.data)
+                X, y = self.processor.preprocess(self.best_s,self.best_fh, self.use_neighbours)
+                X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y, split_type=2, test_shuffle=False)
+                # start_time = time.time()
+                if self.baseline_type == "simple-linear":
+                    linearreg = SimpleLinearRegressor(
+                        X.shape,
+                        self.best_fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True, begin=months_days[month][0], end=months_days[month][1]) 
+
+                    mean_rmse = np.mean(rmse_values)
+                    
+                    self.month_error[months_names[month]] = mean_rmse
+
+                elif self.baseline_type == "linear":
+                    linearreg = LinearRegressor(
+                        X.shape,
+                        self.best_fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True, begin=months_days[month][0], end=months_days[month][1])
+
+                    mean_rmse = np.mean(rmse_values)
+                    self.month_error[months_names[month]] = mean_rmse
+                elif self.baseline_type == "lgbm":
+                    regressor = GradBooster(X.shape, self.best_fh, self.feature_list)
+                    regressor.train(X_train, y_train, normalize=True)
+                    y_hat = regressor.predict_(X_test, y_test)
+                    rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True, begin=months_days[month][0], end=months_days[month][1])
+
+                    mean_rmse = np.mean(rmse_values)
+                    self.month_error[months_names[month]] = mean_rmse
+                elif self.baseline_type == "gnn":
+                    cfg.FH  = self.best_fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(num_epochs=self.num_epochs)
+                    print(months_days[month][0], months_days[month][1])
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])   
+                    rmse_values = rmse_values[0]
+                    mean_rmse = np.mean(rmse_values)
+                    self.month_error[months_names[month]] = mean_rmse
+                elif self.baseline_type == "cnn":
+                    cfg.FH  = self.best_fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(self.num_epochs)
+                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])
+                    rmse_values = rmse_values[0]
+                    mean_rmse = np.mean(rmse_values)
+                    self.month_error[months_names[month]] = mean_rmse
+                else:
+                        raise InvalidBaselineException
+        except InvalidBaselineException:
+            print(
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   

@@ -1,8 +1,10 @@
 import os
 import numpy as np
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
 from models.data_processor import DataProcessor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from models.tigge.tigge import evaluate_and_compare
 
 
 class Analyzer:
@@ -10,12 +12,14 @@ class Analyzer:
         self.pred_dir = {}
         self.er_dir = {}
         self.era5 = None
+        self.df_err = None
+        self.df_pred = None
+        self.feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
 
     def init(self):
         self.get_pred_tensors()
         self.get_era5()
-        # self.best_with_tigge_approx()
-        # self.calculate_errors()
+        self.calculate_errors()
 
     def get_pred_tensors(self, path="../data/pred/"):
         for model in os.listdir(path):
@@ -27,6 +31,67 @@ class Analyzer:
     def get_era5(self):
         processor = DataProcessor(path="../data/input/data2021-small.grib")
         self.era5 = processor.data
+
+    def calculate_errors(self):
+        for model, pred_tensor in self.pred_dir.items():
+            if "tigge" not in str(model):
+                self.er_dir[model] = self.era5 - np.squeeze(pred_tensor, axis=-1)[1:]
+
+    def plot_err_corr_matrix(self):
+        fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+        for i, (feature, ax) in enumerate(zip(self.feature_list, axs.flatten())):
+            ax.set_title(feature)
+            df_err = pd.DataFrame(
+                {key: self.er_dir[key][..., i, :].reshape(-1) for key in self.er_dir}
+            )
+            sns.heatmap(
+                df_err.corr(),
+                square=True,
+                cmap="RdYlGn",
+                annot=True,
+                ax=ax,
+                annot_kws={"fontsize": 8},
+            )
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+        plt.tight_layout()
+        plt.show()
+
+    def plot_pred_corr_matrix(self):
+        fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+        filtered_pred_dir = {
+            key: value for key, value in self.pred_dir.items() if key != "tigge"
+        }
+        for i, (feature, ax) in enumerate(zip(self.feature_list, axs.flatten())):
+            ax.set_title(feature)
+            df_pred = pd.DataFrame(
+                {
+                    key: filtered_pred_dir[key][..., i, :].reshape(-1)
+                    for key in filtered_pred_dir
+                }
+            )
+            sns.heatmap(
+                df_pred.corr(),
+                square=True,
+                cmap="RdYlGn",
+                annot=True,
+                ax=ax,
+                annot_kws={"fontsize": 8},
+            )
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+        plt.tight_layout()
+        plt.show()
+
+    def best_with_tigge_approx(self):
+        y_trans = self.pred_dir["trans"][..., 0][1:][1::2]
+        y_tigge = self.pred_dir["tigge"]
+        for a in np.arange(0.1, 1, 0.1):
+            print("Alpha: ", a)
+            self.combine_and_evaluate(y_trans, y_tigge, alpha=a)
+            print("\n\n")
+
+    def combine_and_evaluate(self, y1, y2, alpha=0.5):
+        y = alpha * y1 + (1 - alpha) * y2
+        self.calculate_metrics(y, self.era5[1::2])
 
     @staticmethod
     def calculate_metrics(y_hat, y, verbose=True):
@@ -41,23 +106,3 @@ class Analyzer:
             rmse_features.append(rmse)
             mae_features.append(mae)
         return rmse_features, mae_features
-
-    def calculate_errors(self):
-        for model, pred_tensor in self.pred_dir.items():
-            self.er_dir[model] = np.abs(pred_tensor - self.era5)
-
-    def calculate_corr_matrix(self):
-        # TODO
-        pass
-
-    def best_with_tigge_approx(self):
-        y_trans = self.pred_dir["trans"][..., 0][1:][1::2]
-        y_tigge = self.pred_dir["tigge"]
-        for a in np.arange(0.1, 1, 0.1):
-            print("Alpha: ", a)
-            self.combine_and_evaluate(y_trans, y_tigge, alpha=a)
-            print("\n\n")
-
-    def combine_and_evaluate(self, y1, y2, alpha=0.5):
-        y = alpha * y1 + (1 - alpha) * y2
-        evaluate_and_compare(y, self.era5[1::2], max_samples=0)

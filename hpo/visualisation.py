@@ -344,4 +344,24 @@ class Visualization:
 
         
 
+    def plot_gnn_alpha(self):
+        # Create a single plot with multiple lines and legend
+        fig, ax = plt.subplots(figsize=(10, 8))
 
+        # Iterate over each baseline_type and plot the data
+        for baseline_type in self.plots_data.keys():
+            if baseline_type == 'gnn':
+                alpha_plot_x = self.plots_data[baseline_type]["gnn_alpha_plot_x"]
+                alpha_plot_y = self.plots_data[baseline_type]["gnn_alpha_plot_y"]
+
+                # Plot the data on the single plot
+                ax.plot(alpha_plot_x, alpha_plot_y, label=baseline_type)
+                ax.set_xlabel("Alpha")
+                ax.set_ylabel("Rmse")
+
+        # Set the title and legend
+        ax.set_title("Alpha for Gnn and Tigge mix")
+        ax.legend()
+
+        # Show the plot
+        plt.show()

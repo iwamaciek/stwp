@@ -3,8 +3,11 @@ import numpy as np
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+import warnings
 from models.data_processor import DataProcessor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+warnings.filterwarnings("ignore")
 
 
 class Analyzer:
@@ -92,6 +95,18 @@ class Analyzer:
     def combine_and_evaluate(self, y1, y2, alpha=0.5):
         y = alpha * y1 + (1 - alpha) * y2
         self.calculate_metrics(y, self.era5[1::2])
+
+    def plot_feature_distributions(self, plot_type="dist"):
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        for i, (feature, ax) in enumerate(zip(self.feature_list, axes.flatten())):
+            data_for_feature = self.era5[..., i].flatten()
+            if plot_type == "dist":
+                sns.distplot(data_for_feature, kde=True, color="skyblue", ax=ax)
+            else:
+                sns.histplot(data_for_feature, kde=True, color="skyblue", ax=ax)
+            ax.set_title(feature)
+        plt.tight_layout()
+        plt.show()
 
     @staticmethod
     def calculate_metrics(y_hat, y, verbose=True):

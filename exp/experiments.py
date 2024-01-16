@@ -2,6 +2,7 @@ import os
 import numpy as np
 from models.data_processor import DataProcessor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+from models.tigge.tigge import evaluate_and_compare
 
 
 class Analyzer:
@@ -10,10 +11,10 @@ class Analyzer:
         self.er_dir = {}
         self.era5 = None
 
-    def err_corr_analysis(self):
+    def init(self):
         self.get_pred_tensors()
-        self.best_with_tigge_approx()
-        # self.get_era5()
+        self.get_era5()
+        # self.best_with_tigge_approx()
         # self.calculate_errors()
 
     def get_pred_tensors(self, path="../data/pred/"):
@@ -24,10 +25,8 @@ class Analyzer:
                 self.pred_dir[model.split("_2024")[0]] = pred_tensor
 
     def get_era5(self):
-        processor = DataProcessor()
-        X, y = processor.preprocess()
-        _, _, _, data = processor.train_val_test_split(X, y, split_type=2)
-        self.era5 = data.transpose((0, 1, 2, 4, 3))
+        processor = DataProcessor(path="../data/input/data2021-small.grib")
+        self.era5 = processor.data
 
     @staticmethod
     def calculate_metrics(y_hat, y, verbose=True):
@@ -52,19 +51,13 @@ class Analyzer:
         pass
 
     def best_with_tigge_approx(self):
-        # y_trans = self.pred_dir['trans']
-        # # take every odd sample to be compatible with tigge
-        # y_trans = y_trans[1::2]
-        # y_tigge = self.pred_dir['tigge']
-        # print(y_trans.shape, y_tigge.shape)
-        # TODO
-        pass
+        y_trans = self.pred_dir["trans"][..., 0][1:][1::2]
+        y_tigge = self.pred_dir["tigge"]
+        for a in np.arange(0.1, 1, 0.1):
+            print("Alpha: ", a)
+            self.combine_and_evaluate(y_trans, y_tigge, alpha=a)
+            print("\n\n")
 
-    def extract_seasons(self):
-        pass
-        # month = y_hat.shape[0] // 12
-        # winter = np.concatenate((y_hat[:2 * month], y_hat[-month:]), axis=0)
-        # spring = y_hat[2 * month:5 * month]
-        # summer = y_hat[5 * month:8 * month]
-        # autumn = y_hat[8 * month:11 * month]
-        # return winter, spring, summer, autumn
+    def combine_and_evaluate(self, y1, y2, alpha=0.5):
+        y = alpha * y1 + (1 - alpha) * y2
+        evaluate_and_compare(y, self.era5[1::2], max_samples=0)

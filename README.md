@@ -1,4 +1,7 @@
-# stwp - short term weather prediction
+# STWP - Short Term Weather Prediction
+
+
+This repository is specifically designed for the research component of the engineering thesis titled "A Machine Learning System for Short-Term Weather Prediction." It encompasses not only the implementation of baseline models and the main architecture but also includes modules for data preprocessing, training pipelines, hyperparameter optimization, result presentation, an API facilitating communication with a [mobile application](https://github.com/JaJasiok/meteo-mind/) for the best model, and scripts for downloading data from the [ERA5](https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels) dataset.
 
 ### Install prerequisites:
 ```shell
@@ -7,32 +10,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-##### If you want to play with torch_geometric_temporal:
-```
-pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-{PYTORCH_VERSION}.html
-pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-{PYTORCH_VERSION}.html
-pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-{PYTORCH_VERSION}.html
-pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-{PYTORCH_VERSION}.html
-pip install torch-geometric
-pip install torch-geometric-temporal
-```
-
-
 ### Config pre-commit hooks
 <!-- Instruction [here](pre-commit-instruction.md). -->
 ```shell
 pip install -r requirements.txt
 pre-commit install
-```
-
-### Hyperparameter optimization
-For linear regression:
-```shell
-python hpo_linear_regression.py <baseline_type: linear or simple-linear> <number of trials> <use neighbours: True or False>
-```
-Sample:
-```shell
-python hpo_linear_regression.py linear 5 False
 ```
 
 ### API dockerization

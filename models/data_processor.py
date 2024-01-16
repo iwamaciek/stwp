@@ -16,6 +16,7 @@ class DataProcessor:
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        path=cfg.DATA_PATH,
     ):
         self.num_spatial_constants, self.num_temporal_constants = 0, 0
         self.temporal_encoding = temporal_encoding or additional_encodings
@@ -26,6 +27,7 @@ class DataProcessor:
             self.temporal_data,
             self.spatial_data,
         ) = self.load_data(
+            path=path,
             spatial_encoding=self.spatial_encoding,
             temporal_encoding=self.temporal_encoding,
         )
@@ -216,7 +218,7 @@ class DataProcessor:
             )
             X_train, y_train = shuffle(X_train, y_train, random_state=cfg.RANDOM_STATE)
             X_val, y_val = shuffle(X_val, y_val, random_state=cfg.RANDOM_STATE)
-            X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
+            # X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
 
             return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -233,7 +235,7 @@ class DataProcessor:
             y_train, y_test = y[:train_samples], y[train_samples:]
 
         X_train, y_train = shuffle(X_train, y_train, random_state=cfg.RANDOM_STATE)
-        X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
+        # X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
 
         return X_train, X_test, y_train, y_test
 

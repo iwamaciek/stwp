@@ -267,7 +267,7 @@ class NNDataProcessor:
         # random state for reproduction
         train_dataset = shuffle(train_dataset, random_state=self.cfg.RANDOM_STATE)
         val_dataset = shuffle(val_dataset, random_state=self.cfg.RANDOM_STATE)
-        test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
+        # test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
 
         if subset is not None:
             train_dataset = train_dataset[: subset * self.cfg.BATCH_SIZE]
@@ -318,7 +318,7 @@ class NNDataProcessor:
         up_lon = lon_diff // 2
         down_lon = new_lon + lon_diff - up_lon - 1
 
-        mapped_tensor = input_tensor[:, left_lat:right_lat, up_lon:down_lon]
+        mapped_tensor = input_tensor[:, left_lat:right_lat, lon_diff:]
         mapped_tensor.reshape(-1, self.num_features, mapped_tensor.shape[4])
 
         return mapped_tensor

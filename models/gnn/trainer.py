@@ -451,6 +451,12 @@ class Trainer:
             path = f"../data/pred/{self.architecture}_{t}.npy"
         np.save(path, y_hat)
 
+    def calculate_model_params(self):
+        params = 0
+        for p in self.model.parameters():
+            params += p.reshape(-1).shape[0]
+        print(f"Model parameters: {params}")
+
     @staticmethod
     def clip_total_cloud_cover(y_hat, idx=2):
         y_hat[..., idx, :] = np.clip(y_hat[..., idx, :], 0, 1)

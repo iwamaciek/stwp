@@ -12,6 +12,7 @@ class Analyzer:
 
     def err_corr_analysis(self):
         self.get_pred_tensors()
+        self.best_with_tigge_approx()
         # self.get_era5()
         # self.calculate_errors()
 
@@ -47,6 +48,15 @@ class Analyzer:
             self.er_dir[model] = np.abs(pred_tensor - self.era5)
 
     def calculate_corr_matrix(self):
+        # TODO
+        pass
+
+    def best_with_tigge_approx(self):
+        # y_trans = self.pred_dir['trans']
+        # # take every odd sample to be compatible with tigge
+        # y_trans = y_trans[1::2]
+        # y_tigge = self.pred_dir['tigge']
+        # print(y_trans.shape, y_tigge.shape)
         # TODO
         pass
 

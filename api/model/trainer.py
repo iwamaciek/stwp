@@ -365,10 +365,15 @@ class Trainer:
     def get_model(self):
         return self.model
 
-    def predict_to_json(self, X=None, path="../app/data/data.json", which_sequence=1):
+    def predict_to_json(self, X=None, path="../app/data/data.json", which_sequence=0):
         if X is None:
-            for i in range(which_sequence):
-                X = next(iter(self.test_loader))  # batch size should be set to 1 !
+            i = 0
+            for data in self.test_loader:
+                if i == which_sequence:
+                    X = data
+                    break
+                else:
+                    i = i + 1
         _, y_hat = self.inverse_normalization_predict(
             X.x, X.y, X.edge_index, X.edge_attr, X.pos, X.time
         )
@@ -391,7 +396,7 @@ class Trainer:
                 for k, feature in enumerate(self.feature_list):
                     json_data[str(lat)][str(lon)][feature] = {}
                     for ts in range(y_hat.shape[-1]):
-                        t = prediction_date + timedelta(hours=6)
+                        t = prediction_date + timedelta(hours=6*(ts+1))
                         json_data[str(lat)][str(lon)][feature][t.strftime("%Y-%m-%dT%H:%M:%S")] = float(y_hat[i, j, k, ts])
 
         with open(path, "w") as f:

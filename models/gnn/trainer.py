@@ -404,7 +404,7 @@ class Trainer:
                     json_data[lat][lon][feature] = {}
                     for ts in range(y_hat.shape[-1]):
                         if ts_real:
-                            t = prediction_date + timedelta(hours=6)
+                            t = prediction_date + timedelta(hours=6*(ts+1))
                             t = t.strftime("%Y-%m-%dT%H:%M:%S")
                         else:
                             t = ts

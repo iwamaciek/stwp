@@ -60,13 +60,13 @@ def get_current_data():
     trainer.load_model("../model/data/gnn_fh5.pt")
 
     if most_recent_hour == 0:
-        json_data = trainer.predict_to_json(which_sequence=1)
+        json_data = trainer.predict_to_json(which_sequence=0)
     elif most_recent_hour == 6:
-        json_data = trainer.predict_to_json(which_sequence=2)
+        json_data = trainer.predict_to_json(which_sequence=1)
     elif most_recent_hour == 12:
-        json_data = trainer.predict_to_json(which_sequence=3)
+        json_data = trainer.predict_to_json(which_sequence=2)
     elif most_recent_hour == 18:
-        json_data = trainer.predict_to_json(which_sequence=4)
+        json_data = trainer.predict_to_json(which_sequence=3)
     else:
         raise ValueError(f"Hour is incompatible: {most_recent_hour}")
 

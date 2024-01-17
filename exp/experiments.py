@@ -40,7 +40,7 @@ class Analyzer:
             if "tigge" not in str(model):
                 self.er_dir[model] = self.era5 - np.squeeze(pred_tensor, axis=-1)[1:]
 
-    def plot_err_corr_matrix(self):
+    def plot_err_corr_matrix(self, save=False):
         fig, axs = plt.subplots(2, 3, figsize=(15, 10))
         for i, (feature, ax) in enumerate(zip(self.feature_list, axs.flatten())):
             ax.set_title(feature)
@@ -57,9 +57,11 @@ class Analyzer:
             )
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
         plt.tight_layout()
+        if save:
+            plt.savefig("../data/analysis/err_corr_matrix.pdf")
         plt.show()
 
-    def plot_pred_corr_matrix(self):
+    def plot_pred_corr_matrix(self, save=False):
         fig, axs = plt.subplots(2, 3, figsize=(15, 10))
         filtered_pred_dir = {
             key: value for key, value in self.pred_dir.items() if key != "tigge"
@@ -82,6 +84,8 @@ class Analyzer:
             )
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
         plt.tight_layout()
+        if save:
+            plt.savefig("../data/analysis/pred_corr_matrix.pdf")
         plt.show()
 
     def best_with_tigge_approx(self):
@@ -96,8 +100,13 @@ class Analyzer:
         y = alpha * y1 + (1 - alpha) * y2
         self.calculate_metrics(y, self.era5[1::2])
 
-    def plot_feature_distributions(self, plot_type="dist"):
+    def plot_feature_distributions(self, plot_type="dist", save=False, stats=True):
         fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        if stats:
+            stats_df = pd.DataFrame(
+                index=self.feature_list,
+                columns=["Mean", "Variance", "Skewness", "Kurtosis"],
+            )
         for i, (feature, ax) in enumerate(zip(self.feature_list, axes.flatten())):
             data_for_feature = self.era5[..., i].flatten()
             if plot_type == "dist":
@@ -105,7 +114,17 @@ class Analyzer:
             else:
                 sns.histplot(data_for_feature, kde=True, color="skyblue", ax=ax)
             ax.set_title(feature)
+            if stats:
+                mean_val = np.mean(data_for_feature)
+                var_val = np.var(data_for_feature)
+                skewness_val = pd.Series(data_for_feature).skew()
+                kurtosis_val = pd.Series(data_for_feature).kurtosis()
+                stats_df.loc[feature] = [mean_val, var_val, skewness_val, kurtosis_val]
+        if stats:
+            print(stats_df.to_latex())
         plt.tight_layout()
+        if save:
+            plt.savefig("../data/analysis/feature_dist.pdf")
         plt.show()
 
     @staticmethod

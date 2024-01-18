@@ -174,8 +174,8 @@ class DataProcessor:
             for t in range(data.shape[0]):
                 for idx, v in enumerate(
                     [
-                        trig_encode(get_day_of_year(dt[t]), 365, "sin"),
-                        trig_encode(get_day_of_year(dt[t]), 365, "cos"),
+                        trig_encode(get_day_of_year(dt[t]), 366, "sin"),
+                        trig_encode(get_day_of_year(dt[t]), 366, "cos"),
                         trig_encode(dt[t].hour, 24, "sin"),
                         trig_encode(dt[t].hour, 24, "cos"),
                     ]

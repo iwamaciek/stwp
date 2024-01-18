@@ -10,6 +10,7 @@ __pycache__/
 .idea
 emc.py
 *.pt
+*.npy
 *.json
 *.png
 *.zip

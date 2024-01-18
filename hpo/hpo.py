@@ -6,9 +6,11 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from functools import partial
 from sklearn.metrics import mean_squared_error
+import torch
 
 import json
 import time
+from datetime import datetime
 import sys
 
 sys.path.append("..")
@@ -34,10 +36,9 @@ class HPO:
         self,
         baseline_type,
         n_trials,
-        dataset,
         use_neighbours=False,
-        # max_sequence_length = 15,
         sequence_length=1,
+        forcasting_horizon=1,
         sequence_n_trials=15,
         sequence_alpha=5,
         sequence_regressor="ridge",
@@ -50,7 +51,6 @@ class HPO:
         self.baseline_type = baseline_type
         self.n_trials = n_trials
         self.use_neighbours = use_neighbours
-        # self.max_sequence_length = max_sequence_length
         self.sequence_n_trials = sequence_n_trials
         self.sequence_alpha = sequence_alpha
         self.sequence_regressor = sequence_regressor
@@ -58,11 +58,11 @@ class HPO:
         self.processor = DataProcessor()
         self.data, self.feature_list = self.processor.data, self.processor.feature_list
         self.best_s = sequence_length
-        self.fh = 1
+        self.fh = forcasting_horizon
         self.best_fh = self.fh
         self.regressors = ["lasso", "ridge", "elastic_net"]
 
-        self.subset = 1
+        self.subset = None
         self.num_epochs = num_epochs
         
         self.scalers = ["standard", "min_max", "max_abs", "robust"]
@@ -81,6 +81,7 @@ class HPO:
         self.fh_plot_time = []
 
         self.metrics = []
+        self.metrics_mae = []
 
         self.metrics_for_scalers = {}
 
@@ -90,6 +91,8 @@ class HPO:
 
 
         self.month_error = {}
+
+        self.gnn_verbose = True
 
     def run_hpo(self):
         return -1
@@ -229,10 +232,16 @@ class HPO:
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
                     rmse_values = rmse_values[0]
-                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
                     rmse_not_normalized = rmse_not_normalized[0]
+
+                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_s{s}.pt")
+
+                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_s_{s}_norm.pt")
+
+                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_s_{s}_real.pt")
 
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
@@ -241,11 +250,17 @@ class HPO:
                     cfg.INPUT_SIZE = s
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
                     rmse_values = rmse_values[0]
-                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
+
+                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_s{s}.pt")
+
+                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_s_{s}_norm.pt")
+
+                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_s_{s}_real.pt")
                 else:
                     raise InvalidBaselineException
                 
@@ -453,23 +468,38 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
                     rmse_values = rmse_values[0]
                     # rmse_values, _ = trainer.autoreg_evaluate("test", fh=fh, verbose=False)                    
-                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
+
+                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_fh_{fh}.pt")
+
+                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt")
+
+                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt")
+
+
                 elif self.baseline_type == "cnn":
                     # trainer = CNNTrainer(subset=self.subset)
                     cfg.FH  = fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
                     rmse_values = rmse_values[0]
-                    rmse_not_normalized, _ = trainer.evaluate("test", verbose=False)
+                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
+
+
+                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_fh_{fh}.pt")
+
+                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt")
+
+                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt")
                 else:
                     raise InvalidBaselineException
                 
@@ -588,7 +618,8 @@ class HPO:
                 )
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
-                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=False)
+                mae_values = linearreg.get_mae(y_hat, y_test, normalize=False)
             elif self.baseline_type == "linear":
                 linearreg = LinearRegressor(
                     X.shape,
@@ -598,20 +629,23 @@ class HPO:
                 )
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
-                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=False)
+                mae_values = linearreg.get_mae(y_hat, y_test, normalize=False)
             elif self.baseline_type == "lgbm":
                 regressor = GradBooster(X.shape, self.best_fh, self.feature_list, **self.params)
                 regressor.train(X_train, y_train, normalize=True)
                 y_hat = regressor.predict_(X_test, y_test)
-                rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+                rmse_values = regressor.get_rmse(y_hat, y_test, normalize=False)
+                mae_values = regressor.get_mae(y_hat, y_test, normalize=False)
             elif self.baseline_type == "gnn":
                     trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=True)
                     rmse_values = rmse_values[0]
+                    mae_values = rmse_values[1]
     
             elif self.baseline_type == "cnn":
                     trainer = CNNTrainer(subset=self.subset)
@@ -619,13 +653,18 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=True)
                     rmse_values = rmse_values[0]
+                    mae_values = rmse_values[1]
+
+
+
 
             else:
                 raise InvalidBaselineException
 
             self.metrics = rmse_values
+            self.metrics_mae = mae_values
 
             print("Metrics collected.", rmse_values)
 
@@ -639,7 +678,7 @@ class HPO:
 
     
     def write_plots_to_json(self):
-        file_name = "modelsplots.json"
+        file_name = f"modelsplots.json"
         data = {}
 
         # Load existing data from file
@@ -721,7 +760,7 @@ class HPO:
                     cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
                     rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
@@ -731,7 +770,7 @@ class HPO:
                     cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+                    rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
                     rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                 else:
@@ -754,6 +793,7 @@ class HPO:
             )   
 
     def monthly_error(self):
+
         try:
             months_days = {
                 1: (1, 31),
@@ -841,7 +881,7 @@ class HPO:
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
                     print(months_days[month][0], months_days[month][1])
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])   
+                    rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])   
                     rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse
@@ -850,7 +890,7 @@ class HPO:
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
                     trainer.train(self.num_epochs)
-                    rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])
+                    rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])
                     rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse

@@ -17,6 +17,8 @@ from models.gnn.gnn_module import GNNModule
 from utils.draw_functions import draw_poland
 from datetime import datetime
 
+from utils.trig_encode import trig_decode
+
 
 class Trainer:
     def __init__(
@@ -330,7 +332,8 @@ class Trainer:
             if begin is not None and end is not None:
                 v_sin = batch.time[0].item()
                 v_cos = batch.time[1].item()
-                ts = np.arctan2(v_sin, v_cos) / (2 * np.pi) * 365
+                # ts = np.arctan2(v_sin, v_cos) / (2 * np.pi) * 365
+                ts = trig_decode(v_sin, v_cos, 366)
                 print(f"ts: {ts}, begin: {begin}, end: {end}")
                 if begin > ts:
                     print("continue")
@@ -350,14 +353,21 @@ class Trainer:
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
+
+            print(f'y_hat: {y_hat.shape}, y_hat_i: {y_hat_i.shape}, y_i: {y_i.shape}, batch.x: {batch.x.shape}, y: {y.shape}')
+
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
         
-        print(y_hat.shape)
-        print(y_hat)
-
-        return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
+        # print(y_hat.shape)
+        # print(y_hat)
+        try:
+            return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
+        
+        except Exception as e:
+            print(e)
+            return None, None
 
     def autoreg_evaluate(self, data_type="test", fh=2, verbose=True, inverse_norm=True):
         # Only works for fh=1 for now

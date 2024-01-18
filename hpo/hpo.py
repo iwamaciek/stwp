@@ -94,12 +94,20 @@ class HPO:
 
         self.gnn_verbose = True
 
+        self.best_alpha = 0.1
+        self.gnn_alpha_plot_x = []
+        self.gnn_alpha_plot_y = []
+
     def run_hpo(self):
         return -1
 
     def clear_sequence_plot(self):
         self.sequence_plot_x = []
         self.sequence_plot_y = []
+
+    def clear_alpha_plot(self):
+        self.gnn_alpha_plot_x = []
+        self.gnn_alpha_plot_y = []
 
     def clear_fh_plot(self):
         self.fh_plot_x = []
@@ -700,7 +708,9 @@ class HPO:
             "metrics_for_scalers": self.metrics_for_scalers,
             "not_normalized_plot_sequence": self.not_normalized_plot_sequence,
             "not_normalized_plot_fh": self.not_normalized_plot_fh,
-            "month_error": self.month_error 
+            "month_error": self.month_error ,
+            "gnn_alpha_plot_x": self.gnn_alpha_plot_x,
+            "gnn_alpha_plot_y": self.gnn_alpha_plot_y,
         }
 
         # Write data to file
@@ -900,3 +910,47 @@ class HPO:
             print(
                 "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
             )   
+
+
+    def gnn_alpha_plot(self):
+        self.clear_alpha_plot()
+        best_alpha = 0
+        max_rmse = np.inf
+
+        printProgressBar(0, alpha, prefix = ' Alpha Progress:', suffix = 'Complete', length = 50)
+
+
+        trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
+        
+        for alpha in range(0.1, 1, 0.1):
+            start_time = time.time()
+            
+                
+            cfg.FH  = self.best_fh
+            cfg.INPUT_SIZE = self.best_s
+            trainer.update_config(cfg)
+            trainer.train(num_epochs=self.num_epochs)
+            #TODO: tigge and gnn mix 
+
+            rmse_values, _ = trainer.evaluate("test", verbose=False, inverse_norm=False)
+            rmse_values = rmse_values[0]
+
+            mean_rmse = np.mean(rmse_values)
+        
+            end_time = time.time()
+
+            self.gnn_alpha_plot_x.append(alpha)
+            self.gnn_alpha_plot_y.append(mean_rmse)
+
+
+
+            execution_time = end_time - start_time
+            print(execution_time)
+
+            if mean_rmse < max_rmse:
+                max_rmse = mean_rmse
+                best_alpha = alpha
+
+            printProgressBar(alpha, 1, prefix = 'Alpha Progress:', suffix = 'Complete', length = 50)
+
+        self.best_alpha = best_alpha

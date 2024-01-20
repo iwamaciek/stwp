@@ -327,20 +327,17 @@ class Trainer:
 
         y = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
-        for i, batch in enumerate(loader):
-            print(i)
+        for batch in loader:
+            # print(i)
             if begin is not None and end is not None:
                 v_sin = batch.time[0].item()
                 v_cos = batch.time[1].item()
                 # ts = np.arctan2(v_sin, v_cos) / (2 * np.pi) * 365
                 ts = trig_decode(v_sin, v_cos, 366)
-                print(f"ts: {ts}, begin: {begin}, end: {end}")
-                if begin > ts:
-                    print("continue")
+                # print(f"ts: {ts}, begin: {begin}, end: {end}")
+                if begin > ts or end < ts:
+                    # print("continue")
                     continue
-                elif end < ts:
-                    print("break")
-                    break
             y_i, y_hat_i = self.predict(
                 batch.x,
                 batch.y,
@@ -354,7 +351,7 @@ class Trainer:
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
 
-            print(f'y_hat: {y_hat.shape}, y_hat_i: {y_hat_i.shape}, y_i: {y_i.shape}, batch.x: {batch.x.shape}, y: {y.shape}')
+            # print(f'y_hat: {y_hat.shape}, y_hat_i: {y_hat_i.shape}, y_i: {y_i.shape}, batch.x: {batch.x.shape}, y: {y.shape}')
 
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)

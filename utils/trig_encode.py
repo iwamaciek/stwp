@@ -18,8 +18,8 @@ def trig_decode(vsin, vcos, norm_v):
         va = np.array([varcsin, np.pi - varcsin])
     varccos = np.arccos(vcos)
     vb = np.array([varccos, 2*np.pi - varccos])
-    va = np.round(va, 5)
-    vb = np.round(vb, 5)
+    va = np.round(va, 3)
+    vb = np.round(vb, 3)
     v = np.intersect1d(va, vb)[0]
 
 

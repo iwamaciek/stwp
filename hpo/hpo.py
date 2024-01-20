@@ -188,7 +188,7 @@ class HPO:
             if self.baseline_type == 'gnn':
                 trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
             elif self.baseline_type == 'cnn':
-                trainer = CNNTrainer(subset=self.subset)
+                trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
 
             for s in range(1, self.sequence_n_trials + 1):
                 # processor = DataProcessor(self.data)
@@ -428,7 +428,7 @@ class HPO:
             if self.baseline_type == 'gnn':
                 trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
             elif self.baseline_type == 'cnn':
-                trainer = CNNTrainer(subset=self.subset)
+                trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
 
             for fh in range(1, self.fh_n_trials + 1):
                 # processor = DataProcessor(self.data)
@@ -656,7 +656,7 @@ class HPO:
                     mae_values = rmse_values[1]
     
             elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer(subset=self.subset)
+                    trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
                     cfg.FH  = self.fh
                     cfg.INPUT_SIZE = self.best_s
                     trainer.update_config(cfg)
@@ -774,7 +774,7 @@ class HPO:
                     rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                 elif self.baseline_type == "cnn":
-                    trainer = CNNTrainer(subset=self.subset)
+                    trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
                     cfg.FH  = self.best_fh
                     cfg.INPUT_SIZE = self.best_s
                     cfg.SCALER_TYPE = scaler
@@ -842,70 +842,74 @@ class HPO:
                 trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
 
 
-            for month in range(1, 13):
-                self.processor.upload_data(self.data)
-                X, y = self.processor.preprocess(self.best_s,self.best_fh, self.use_neighbours)
-                X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y, split_type=2, test_shuffle=False)
-                # start_time = time.time()
-                if self.baseline_type == "simple-linear":
-                    linearreg = SimpleLinearRegressor(
-                        X.shape,
-                        self.best_fh,
-                        self.feature_list,
-                        regressor_type=self.sequence_regressor,
-                        alpha=self.sequence_alpha,
-                    )
-                    linearreg.train(X_train, y_train, normalize=True)
-                    y_hat = linearreg.predict_(X_test, y_test)
+            # for month in range(1, 13):
+            self.processor.upload_data(self.data)
+            X, y = self.processor.preprocess(self.best_s,self.best_fh, self.use_neighbours)
+            X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y, split_type=2, test_shuffle=False)
+            # start_time = time.time()
+            if self.baseline_type == "simple-linear":
+                linearreg = SimpleLinearRegressor(
+                    X.shape,
+                    self.best_fh,
+                    self.feature_list,
+                    regressor_type=self.sequence_regressor,
+                    alpha=self.sequence_alpha,
+                )
+                linearreg.train(X_train, y_train, normalize=True)
+                y_hat = linearreg.predict_(X_test, y_test)
+                for month in range(1, 13):
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True, begin=months_days[month][0], end=months_days[month][1]) 
-
                     mean_rmse = np.mean(rmse_values)
-                    
                     self.month_error[months_names[month]] = mean_rmse
 
-                elif self.baseline_type == "linear":
-                    linearreg = LinearRegressor(
-                        X.shape,
-                        self.best_fh,
-                        self.feature_list,
-                        regressor_type=self.sequence_regressor,
-                        alpha=self.sequence_alpha,
-                    )
-                    linearreg.train(X_train, y_train, normalize=True)
-                    y_hat = linearreg.predict_(X_test, y_test)
+            elif self.baseline_type == "linear":
+                linearreg = LinearRegressor(
+                    X.shape,
+                    self.best_fh,
+                    self.feature_list,
+                    regressor_type=self.sequence_regressor,
+                    alpha=self.sequence_alpha,
+                )
+                linearreg.train(X_train, y_train, normalize=True)
+                y_hat = linearreg.predict_(X_test, y_test)
+                for month in range(1, 13):
                     rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True, begin=months_days[month][0], end=months_days[month][1])
-
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse
-                elif self.baseline_type == "lgbm":
-                    regressor = GradBooster(X.shape, self.best_fh, self.feature_list)
-                    regressor.train(X_train, y_train, normalize=True)
-                    y_hat = regressor.predict_(X_test, y_test)
+                    
+            elif self.baseline_type == "lgbm":
+                regressor = GradBooster(X.shape, self.best_fh, self.feature_list)
+                regressor.train(X_train, y_train, normalize=True)
+                y_hat = regressor.predict_(X_test, y_test)
+                for month in range(1, 13):
                     rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True, begin=months_days[month][0], end=months_days[month][1])
-
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse
-                elif self.baseline_type == "gnn":
-                    cfg.FH  = self.best_fh
-                    cfg.INPUT_SIZE = self.best_s
-                    trainer.update_config(cfg)
-                    trainer.train(num_epochs=self.num_epochs)
-                    print(months_days[month][0], months_days[month][1])
+
+            elif self.baseline_type == "gnn":
+                cfg.FH  = self.best_fh
+                cfg.INPUT_SIZE = self.best_s
+                trainer.update_config(cfg)
+                trainer.train(num_epochs=self.num_epochs)
+                for month in range(1, 13):
                     rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])   
                     rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse
-                elif self.baseline_type == "cnn":
-                    cfg.FH  = self.best_fh
-                    cfg.INPUT_SIZE = self.best_s
-                    trainer.update_config(cfg)
-                    trainer.train(self.num_epochs)
+
+            elif self.baseline_type == "cnn":
+                cfg.FH  = self.best_fh
+                cfg.INPUT_SIZE = self.best_s
+                trainer.update_config(cfg)
+                trainer.train(num_epochs=self.num_epochs)
+                for month in range(1, 13):
                     rmse_values, _ = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False, begin=months_days[month][0], end=months_days[month][1])
                     rmse_values = rmse_values[0]
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse
-                else:
-                        raise InvalidBaselineException
+
+            else:
+                    raise InvalidBaselineException
         except InvalidBaselineException:
             print(
                 "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"

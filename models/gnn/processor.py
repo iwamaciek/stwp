@@ -72,7 +72,7 @@ class NNDataProcessor:
             X_train, X_test, y_train, y_test, scaler_type=self.cfg.SCALER_TYPE
         )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
-            X, y, subset, self.test_shuffle
+            X, y, subset, test_shuffle=self.test_shuffle
         )
 
     def train_val_test_split(self):

@@ -39,7 +39,7 @@ class CNNDataProcessor(NNDataProcessor):
             -1, self.num_latitudes, self.num_longitudes, cfg.FH, self.num_features
         )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
-            X, y, subset
+            X, y, subset, test_shuffle=self.test_shuffle
         )
 
     def map_latitude_longitude_span(

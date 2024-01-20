@@ -11,7 +11,7 @@ class Config:
     R = 2
     GRAPH_CELLS = 5
     SCALER_TYPE = "standard"
-    DATA_PATH = "../data/input/data2019-2021.grib"
+    DATA_PATH = "../data/input/data2021-small-6-18.grib.grib"
     RANDOM_STATE = 42
     INPUT_DIMS = (32, 48)
     OUTPUT_DIMS = (25, 45)

@@ -23,8 +23,10 @@ class NNDataProcessor:
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        path=cfg.DATA_PATH,
     ):
         self.data_proc = DataProcessor(
+            path=path,
             spatial_encoding=spatial_encoding,
             temporal_encoding=temporal_encoding,
             additional_encodings=additional_encodings,

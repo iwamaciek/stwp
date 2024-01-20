@@ -17,7 +17,10 @@ sys.path.append("..")
 from model.utils.get_data import DataImporter
 from model.config import config as cfg
 from model.trainer import Trainer
-import matplotlib
+import cartopy.io.shapereader as shpreader
+import matplotlib.path as mpath
+import matplotlib.patches as patches
+
 
 # Function to create new predictions
 def get_current_data():
@@ -79,7 +82,7 @@ def get_current_data():
 app = FastAPI()
 
 # Load JSON data from file
-# with open("./data/data.json", "r") as file:
+# with open("./data/data3.json", "r") as file:
 #     json_data = json.load(file)
 json_data = None
 
@@ -230,6 +233,17 @@ def create_maps():
         "t2m" : "[°C]"
     }
 
+    # Get the shape of Poland
+    for country in shpreader.Reader(shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')).records():
+        if country.attributes['NAME_LONG'] == 'Poland':
+            poland_geom = country.geometry
+            break
+
+    # Convert the polygon to a path
+    poland_vertices = list(poland_geom.exterior.coords)
+
+    poland_path = mpath.Path(poland_vertices)
+
     # Loop through each feature
     for feature_name, feature in features.items():
         for i in range(feature.shape[2]):
@@ -243,10 +257,9 @@ def create_maps():
             # Add a subplot with the map coordinate reference system
             ax = plt.subplot(1, 1, 1, projection=map_crs)
             ax.set_extent([14, 25, 49, 55])
-            ax.add_feature(cfeature.COASTLINE.with_scale("50m"))
-            ax.add_feature(cfeature.BORDERS)
+            # ax.add_feature(cfeature.COASTLINE.with_scale("50m"))
+            # ax.add_feature(cfeature.BORDERS)
 
-            # gl = ax.gridlines(draw_labels=False, linewidth=1, linestyle="--")
             levels = ranges.get(feature_name)
 
             # Define the color map for the current feature and add a filled contour plot of the data
@@ -262,6 +275,12 @@ def create_maps():
                 cf = ax.contourf(
                     lons, lats, data, levels=levels, cmap=cmap, transform=data_crs
                 )
+
+            # Create a mask for the area outside Poland
+            patch = patches.PathPatch(poland_path, transform=ccrs.PlateCarree(), facecolor='none')
+            ax.add_patch(patch)
+            for collection in cf.collections:
+                collection.set_clip_path(patch)
 
             # Remove axis and labels
             ax.set_axis_off()
@@ -326,7 +345,7 @@ async def get_weather(
     latitude: float = Query(..., description="Latitude of the location"),
     longitude: float = Query(..., description="Longitude of the location"),
 ):
-    global json_data 
+    global json_data
     global previous_data_gather
     current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
     if((current_date - previous_data_gather).seconds > 21600): # 6 hours

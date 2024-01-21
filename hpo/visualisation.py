@@ -53,7 +53,7 @@ class Visualization:
             table.append(row)
 
         return table
-    
+
     def plot_not_normalized_data_sequence(self, for_features=False):
         if for_features == False:
             # Iterate over each baseline_type and plot the data
@@ -64,7 +64,9 @@ class Visualization:
                     fig, ax = plt.subplots(figsize=(10, 8))
 
                     # Get the not_normalized_plot_sequence for the current baseline_type
-                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_sequence"]
+                    not_normalized_plot_sequence = self.plots_data[baseline_type][
+                        "not_normalized_plot_sequence"
+                    ]
 
                 # Plot the data on the subplot
                 ax.plot(
@@ -79,10 +81,10 @@ class Visualization:
                 ax.set_xlabel("Sequence Length")
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
-        # Adjust layout for better spacing
+                # Adjust layout for better spacing
                 plt.tight_layout()
 
-                    # Show the plot for each baseline_type
+                # Show the plot for each baseline_type
                 plt.show()
         else:
             # initialize data structures
@@ -90,7 +92,7 @@ class Visualization:
             plot_dict = {}
             for feature in self.feature_list:
                 plot_dict[feature] = []
-            
+
             # transform data fromat from features per baseline to baselines per feature
             for i, baseline_type in enumerate(self.plots_data.keys()):
                 for_feature_dict = {}
@@ -100,31 +102,35 @@ class Visualization:
                     for_feature_dict[feature] = []
 
                 if "not_normalized_plot_sequence" in self.plots_data[baseline_type]:
-                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_sequence"]
+                    not_normalized_plot_sequence = self.plots_data[baseline_type][
+                        "not_normalized_plot_sequence"
+                    ]
 
                     for i, feature in enumerate(self.feature_list):
                         for key in not_normalized_plot_sequence.keys():
-                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
-                
+                            for_feature_dict[feature].append(
+                                list(not_normalized_plot_sequence[key])[i]
+                            )
+
                     for feature in self.feature_list:
                         plot_dict[feature].append(for_feature_dict[feature])
 
-
             # plot the transformed data
             for feature in self.feature_list:
-                fig, ax = plt.subplots(figsize=(10, 8)) 
+                fig, ax = plt.subplots(figsize=(10, 8))
                 for i in range(len(baselines)):
-                    ax.plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i])
+                    ax.plot(
+                        list(not_normalized_plot_sequence.keys()), plot_dict[feature][i]
+                    )
                     ax.set_title(f"Not Normalized Data Sequence - {feature}")
                 ax.legend(baselines)
                 ax.set_xlabel("Sequence Length")
                 ax.set_ylabel("Rmse")
                 plt.show()
 
-
     def plot_not_normalized_data_fh(self, for_features=False):
         if for_features == False:
-        # Iterate over each baseline_type and plot the data
+            # Iterate over each baseline_type and plot the data
             for i, baseline_type in enumerate(self.plots_data.keys()):
                 # Check if the baseline_type has the "not_normalized_plot_sequence" field
                 if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
@@ -151,7 +157,7 @@ class Visualization:
                 ax.set_xlabel("Forcasting Horizon")
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
-                    # Show the plot for each baseline_type
+                # Show the plot for each baseline_type
                 plt.show()
         else:
             # initialize data structures
@@ -159,7 +165,7 @@ class Visualization:
             plot_dict = {}
             for feature in self.feature_list:
                 plot_dict[feature] = []
-            
+
             # transform data fromat from features per baseline to baselines per feature
             for i, baseline_type in enumerate(self.plots_data.keys()):
                 for_feature_dict = {}
@@ -169,21 +175,26 @@ class Visualization:
                     for_feature_dict[feature] = []
 
                 if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
-                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_fh"]
+                    not_normalized_plot_sequence = self.plots_data[baseline_type][
+                        "not_normalized_plot_fh"
+                    ]
 
                     for i, feature in enumerate(self.feature_list):
                         for key in not_normalized_plot_sequence.keys():
-                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
-                    
+                            for_feature_dict[feature].append(
+                                list(not_normalized_plot_sequence[key])[i]
+                            )
+
                     for feature in self.feature_list:
                         plot_dict[feature].append(for_feature_dict[feature])
 
-
             # plot the transformed data
             for feature in self.feature_list:
-                fig, ax = plt.subplots(figsize=(10, 8)) 
+                fig, ax = plt.subplots(figsize=(10, 8))
                 for i in range(len(baselines)):
-                    ax.plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i])
+                    ax.plot(
+                        list(not_normalized_plot_sequence.keys()), plot_dict[feature][i]
+                    )
                     ax.set_title(f"Not Normalized Data Forcasting Horizon - {feature}")
                 ax.legend(baselines)
                 ax.set_xlabel("Forcasting Horizon")
@@ -388,35 +399,50 @@ class Visualization:
             # Show the plot
             plt.show()
 
-
     def plot_months(self, one_plot=False):
-        
-        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct","Nov","Dec"]
+        months = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        ]
         if one_plot:
-            # Create a single plot with multiple lines and legend
-            fig, ax = plt.subplots(figsize=(10, 8))
+            # Create a single plot with multiple bars and legend
+            fig, ax = plt.subplots(figsize=(15, 8))  # Adjust the width of the plot
             n = 12
-            width = 0.1
+            width = 0.2  # Adjust the width of each bar
             i = 0
             for baseline_type in self.plots_data.keys():
-                month_plot_x = list(range(1,13))
-                month_plot_y = list(self.plots_data[baseline_type]["month_error"].values())
+                month_plot_x = list(range(1, 13))
+                month_plot_y = list(
+                    self.plots_data[baseline_type]["month_error"].values()
+                )
                 ind = np.arange(max(month_plot_x))
                 if len(month_plot_y) == 12:
-                    
-                    ax.bar(ind+width*i, month_plot_y, width, label=baseline_type)
-                    i+=1
+                    ax.bar(ind + width * i, month_plot_y, width, label=baseline_type)
+                    i += 1
 
             # Set the title and legend
-            plt.xticks(ind+width, months) 
+            plt.xticks(
+                ind + width * (i - 1) / 2, months
+            )  # Adjust the position of x-ticks
             ax.set_title("Monthly errors")
             ax.legend()
-            ax.set_xlabel("Forcasting Horizon")
+            ax.set_xlabel("Months")
             ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
             # Show the plot
-            
-            plt.xticks(ind+width, months) 
+            plt.xticks(
+                ind + width * (i - 1) / 2, months
+            )  # Adjust the position of x-ticks
             plt.show()
 
     def plot_data_fh_time(self, one_plot=False):

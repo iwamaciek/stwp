@@ -364,7 +364,7 @@ class Trainer:
         
         except Exception as e:
             print(e)
-            return None, None
+            return None, y_hat
 
     def autoreg_evaluate(self, data_type="test", fh=2, verbose=True, inverse_norm=True):
         # Only works for fh=1 for now

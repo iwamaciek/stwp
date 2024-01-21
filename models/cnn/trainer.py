@@ -192,15 +192,16 @@ class Trainer(GNNTrainer):
 
         yshape = (self.latitude, self.longitude, self.cfg.FH)
 
-        for i in range(self.features):
-            for j in range(y_hat.shape[0]):
-                yi = y[j, ..., i, :].copy().reshape(-1, 1)
-                yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
+        if inverse_norm:
+            for i in range(self.features):
+                for j in range(y_hat.shape[0]):
+                    yi = y[j, ..., i, :].copy().reshape(-1, 1)
+                    yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
-                y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
-                y_hat[j, ..., i, :] = (
-                    self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
-                )
+                    y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
+                    y_hat[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
+                    )
         if inverse_norm:
             y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat

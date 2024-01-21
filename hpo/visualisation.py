@@ -2,6 +2,7 @@ import sys
 import json
 import matplotlib.pyplot as plt
 from tabulate import tabulate
+import numpy as np
 
 plt.style.use("ggplot")
 sys.path.append("..")
@@ -79,10 +80,10 @@ class Visualization:
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
         # Adjust layout for better spacing
-        plt.tight_layout()
+                plt.tight_layout()
 
                     # Show the plot for each baseline_type
-                    plt.show()
+                plt.show()
         else:
             # initialize data structures
             baselines = []
@@ -151,7 +152,7 @@ class Visualization:
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
                     # Show the plot for each baseline_type
-                    plt.show()
+                plt.show()
         else:
             # initialize data structures
             baselines = []
@@ -387,6 +388,37 @@ class Visualization:
             # Show the plot
             plt.show()
 
+
+    def plot_months(self, one_plot=False):
+        
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct","Nov","Dec"]
+        if one_plot:
+            # Create a single plot with multiple lines and legend
+            fig, ax = plt.subplots(figsize=(10, 8))
+            n = 12
+            width = 0.1
+            i = 0
+            for baseline_type in self.plots_data.keys():
+                month_plot_x = list(range(1,13))
+                month_plot_y = list(self.plots_data[baseline_type]["month_error"].values())
+                ind = np.arange(max(month_plot_x))
+                if len(month_plot_y) == 12:
+                    
+                    ax.bar(ind+width*i, month_plot_y, width, label=baseline_type)
+                    i+=1
+
+            # Set the title and legend
+            plt.xticks(ind+width, months) 
+            ax.set_title("Monthly errors")
+            ax.legend()
+            ax.set_xlabel("Forcasting Horizon")
+            ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+
+            # Show the plot
+            
+            plt.xticks(ind+width, months) 
+            plt.show()
+
     def plot_data_fh_time(self, one_plot=False):
         if one_plot:
             # Create a single plot with multiple lines and legend
@@ -458,6 +490,28 @@ class Visualization:
 
         # Set the title and legend
         ax.set_title("Alpha for Gnn and Tigge mix")
+        ax.legend()
+
+        # Show the plot
+        plt.show()
+
+    def plot_gnn_layers(self):
+        # Create a single plot with multiple lines and legend
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        # Iterate over each baseline_type and plot the data
+        for baseline_type in self.plots_data.keys():
+            if baseline_type == "gnn":
+                cell_plot_x = self.plots_data[baseline_type]["gnn_cells_plot_x"]
+                cell_plot_y = self.plots_data[baseline_type]["gnn_cells_plot_y"]
+
+                # Plot the data on the single plot
+                ax.plot(cell_plot_x, cell_plot_y, "-o", label=baseline_type)
+                ax.set_xlabel("Number of Graph Cells")
+                ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+
+        # Set the title and legend
+        ax.set_title("Gnn Graph Cells")
         ax.legend()
 
         # Show the plot

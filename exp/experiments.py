@@ -57,7 +57,9 @@ class Analyzer:
                 )
             else:
                 rmse_per_model, mae_per_model = self.calculate_metrics(
-                    predictions[-self.min_length :], self.era5, verbose=verbose
+                    predictions[-self.min_length :],
+                    self.era5[-self.min_length :],
+                    verbose=verbose,
                 )
             if verbose:
                 print(f"Model: {model}\n\n")
@@ -90,11 +92,8 @@ class Analyzer:
 
     def calculate_errors(self):
         for model, pred_tensor in self.pred_dir.items():
-            print(model)
             if model != "tigge":
-                self.er_dir[model] = np.zeros_like(
-                    self.era5,
-                )
+                self.er_dir[model] = np.zeros_like(self.era5[-self.min_length :])
                 for i in range(len(self.feature_list)):
                     self.er_dir[model][..., i] = (
                         self.era5[-self.min_length :, ..., i]

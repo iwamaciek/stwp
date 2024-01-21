@@ -5,6 +5,7 @@ import torch
 import json
 import time
 import sys
+import os
 
 sys.path.append("..")
 
@@ -38,6 +39,7 @@ class HPO:
         fh_n_trials=15,
         max_alpha=10,
         num_epochs=3,
+        subset=None,
     ):
         self.baseline_type = baseline_type
         self.n_trials = n_trials
@@ -53,7 +55,7 @@ class HPO:
         self.best_fh = self.fh
         self.regressors = ["lasso", "ridge", "elastic_net"]
 
-        self.subset = None
+        self.subset = subset
         self.num_epochs = num_epochs
 
         self.scalers = ["standard", "min_max", "max_abs", "robust"]
@@ -90,6 +92,10 @@ class HPO:
 
         self.gnn_cell_plot_x = []
         self.gnn_cell_plot_y = []
+
+        self.best_layer = 5
+
+        self.error_map = []
 
     def run_hpo(self):
         return -1
@@ -244,6 +250,7 @@ class HPO:
                 elif self.baseline_type == "gnn":
                     cfg.FH = self.fh
                     cfg.INPUT_SIZE = s
+                    cfg.GRAPH_CELLS = self.best_layer
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
                     rmse_values, y_hat_normalized = trainer.evaluate(
@@ -255,19 +262,22 @@ class HPO:
                     )
                     rmse_not_normalized = rmse_not_normalized[0]
 
+                    if not(os.path.isdir(f'./{self.baseline_type}')):
+                        os.mkdir(f'./{self.baseline_type}')
+
                     torch.save(
                         trainer.model.state_dict(),
-                        f"./model_state_{self.baseline_type}_s{s}.pt",
+                        f"./{self.baseline_type}/model_state_{self.baseline_type}_s{s}.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_normalized,
-                        f"./prediction_tensor_{self.baseline_type}_s_{s}_norm.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_s_{s}_norm.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_real,
-                        f"./prediction_tensor_{self.baseline_type}_s_{s}_real.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_s_{s}_real.pt",
                     )
 
                     mean_rmse = np.mean(rmse_values)
@@ -286,19 +296,22 @@ class HPO:
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
 
+                    if not(os.path.isdir(f'./{self.baseline_type}')):
+                        os.mkdir(f'./{self.baseline_type}')
+
                     torch.save(
                         trainer.model.state_dict(),
-                        f"./model_state_{self.baseline_type}_s{s}.pt",
+                        f"./{self.baseline_type}/model_state_{self.baseline_type}_s{s}.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_normalized,
-                        f"./prediction_tensor_{self.baseline_type}_s_{s}_norm.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_s_{s}_norm.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_real,
-                        f"./prediction_tensor_{self.baseline_type}_s_{s}_real.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_s_{s}_real.pt",
                     )
                 else:
                     raise InvalidBaselineException
@@ -535,6 +548,7 @@ class HPO:
                 elif self.baseline_type == "gnn":
                     cfg.FH = fh
                     cfg.INPUT_SIZE = self.best_s
+                    cfg.GRAPH_CELLS = self.best_layer
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
                     rmse_values, y_hat_normalized = trainer.evaluate(
@@ -548,19 +562,22 @@ class HPO:
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
 
+                    if not(os.path.isdir(f'./{self.baseline_type}')):
+                        os.mkdir(f'./{self.baseline_type}')
+
                     torch.save(
                         trainer.model.state_dict(),
-                        f"./model_state_{self.baseline_type}_fh_{fh}.pt",
+                        f"./{self.baseline_type}/model_state_{self.baseline_type}_fh_{fh}.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_normalized,
-                        f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_real,
-                        f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt",
                     )
 
                 elif self.baseline_type == "cnn":
@@ -579,19 +596,22 @@ class HPO:
                     rmse_not_normalized = rmse_not_normalized[0]
                     mean_rmse = np.mean(rmse_values)
 
+                    if not(os.path.isdir(f'./{self.baseline_type}')):
+                        os.mkdir(f'./{self.baseline_type}')
+
                     torch.save(
                         trainer.model.state_dict(),
-                        f"./model_state_{self.baseline_type}_fh_{fh}.pt",
+                        f"./{self.baseline_type}/model_state_{self.baseline_type}_fh_{fh}.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_normalized,
-                        f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt",
                     )
 
                     trainer.save_prediction_tensor(
                         y_hat_real,
-                        f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt",
+                        f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt",
                     )
                 else:
                     raise InvalidBaselineException
@@ -743,13 +763,27 @@ class HPO:
                 )
                 cfg.FH = self.fh
                 cfg.INPUT_SIZE = self.best_s
+                cfg.GRAPH_CELLS = self.best_layer
                 trainer.update_config(cfg)
                 trainer.train(num_epochs=self.num_epochs)
-                rmse_values, _ = trainer.evaluate(
-                    "test", verbose=self.gnn_verbose, inverse_norm=True
-                )
+                rmse_values, y_hat_normalized = trainer.evaluate(
+                        "test", verbose=self.gnn_verbose, inverse_norm=False
+                    )
                 rmse_values = rmse_values[0]
-                mae_values = rmse_values[1]
+                rmse_not_normalized, y_hat_real = trainer.evaluate(
+                    "test", verbose=self.gnn_verbose
+                )
+                rmse_not_normalized = rmse_not_normalized[0]
+                mean_rmse = np.mean(rmse_values)
+
+                if not(os.path.isdir(f'./{self.baseline_type}')):
+                    os.mkdir(f'./{self.baseline_type}')
+
+                torch.save(trainer.model.state_dict(), f"./{self.baseline_type}/model_state_{self.baseline_type}_best}.pt")
+
+                trainer.save_prediction_tensor(y_hat_normalized, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_best_norm.pt")
+
+                trainer.save_prediction_tensor(y_hat_real, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_best_real.pt")
 
             elif self.baseline_type == "cnn":
                 trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
@@ -865,6 +899,7 @@ class HPO:
                     )
                     cfg.FH = self.best_fh
                     cfg.INPUT_SIZE = self.best_s
+                    cfg.GRAPH_CELLS = self.best_layer
                     cfg.SCALER_TYPE = scaler
                     trainer.update_config(cfg)
                     trainer.train(num_epochs=self.num_epochs)
@@ -1014,6 +1049,7 @@ class HPO:
             elif self.baseline_type == "gnn":
                 cfg.FH = self.best_fh
                 cfg.INPUT_SIZE = self.best_s
+                cfg.GRAPH_CELLS = self.best_layer
                 trainer.update_config(cfg)
                 trainer.train(num_epochs=self.num_epochs)
                 for month in range(1, 13):
@@ -1070,6 +1106,7 @@ class HPO:
 
             cfg.FH = self.best_fh
             cfg.INPUT_SIZE = self.best_s
+            cfg.GRAPH_CELLS = self.best_layer
             trainer.update_config(cfg)
             trainer.train(num_epochs=self.num_epochs)
             # TODO: tigge and gnn mix
@@ -1101,6 +1138,8 @@ class HPO:
 
     def gnn_layer(self):
         trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
+        best_layer = 2
+        max_rmse = np.inf
         for cell in range(2, 10):
             cfg.FH = self.fh
             cfg.INPUT_SIZE = self.best_s
@@ -1115,21 +1154,29 @@ class HPO:
             self.gnn_cell_plot_x.append(cell)
             self.gnn_cell_plot_y.append(mean_rmse)
 
+            if mean_rmse < max_rmse:
+                max_rmse = mean_rmse
+                best_layer = cell
 
-            torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_cell_{cell}.pt")
+            if not(os.path.isdir(f'./{self.baseline_type}')):
+                os.mkdir(f'./{self.baseline_type}')
 
-            trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_cell_{cell}_norm.pt")
+            torch.save(trainer.model.state_dict(), f"./{self.baseline_type}/model_state_{self.baseline_type}_cell_{cell}.pt")
 
-            trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_cell_{cell}_real.pt")
+            trainer.save_prediction_tensor(y_hat_normalized, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_cell_{cell}_norm.pt")
+
+            trainer.save_prediction_tensor(y_hat_real, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_cell_{cell}_real.pt")
+        
+        self.best_layer = best_layer
 
 
 
-    def error_maps(self):
+    def error_maps(self, path = None):
         try:
             self.clear_fh_plot()
             best_fh = 0
             max_rmse = np.inf
-            printProgressBar(0, self.sequence_n_trials + 1, prefix = ' Forcasting Horizon Progress:', suffix = 'Complete', length = 50)
+            printProgressBar(0, self.sequence_n_trials + 1, prefix = ' Error Map Progress:', suffix = 'Complete', length = 50)
 
             if self.baseline_type == 'gnn':
                 trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
@@ -1138,102 +1185,113 @@ class HPO:
 
             for fh in range(1, self.fh_n_trials + 1):
                 # processor = DataProcessor(self.data)
-                self.processor.upload_data(self.data)
-                X, y = self.processor.preprocess(self.best_s,fh, self.use_neighbours)
-                X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
+                if path is None:
+                    self.processor.upload_data(self.data)
+                    X, y = self.processor.preprocess(self.best_s,fh, self.use_neighbours)
+                    X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
                 start_time = time.time()
                 if self.baseline_type == "simple-linear":
-                    linearreg = SimpleLinearRegressor(
-                        X.shape,
-                        fh,
-                        self.feature_list,
-                        regressor_type=self.sequence_regressor,
-                        alpha=self.sequence_alpha,
-                    )
-                    linearreg.train(X_train, y_train, normalize=True)
-                    y_hat = linearreg.predict_(X_test, y_test)
-                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
-
-                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
-                    mean_rmse = np.mean(rmse_values)
-
+                    if path is None:
+                        linearreg = SimpleLinearRegressor(
+                            X.shape,
+                            fh,
+                            self.feature_list,
+                            regressor_type=self.sequence_regressor,
+                            alpha=self.sequence_alpha,
+                        )
+                        linearreg.train(X_train, y_train, normalize=True)
+                        y_hat = linearreg.predict_(X_test, y_test)
+                    else:
+                        y_hat = np.load(path)
+                    
+                    y_true = np.load(self.era_path)
+                    y_diff = y_hat - y_true
+                    y_diff = np.mean(y_diff, axis=0)
+                    for i in range(len(self.feature_list)):
+                        self.map_error[self.feature_list[i]] = y_diff[i]
                 elif self.baseline_type == "linear":
-                    linearreg = LinearRegressor(
-                        X.shape,
-                        fh,
-                        self.feature_list,
-                        regressor_type=self.sequence_regressor,
-                        alpha=self.sequence_alpha,
-                    )
-                    linearreg.train(X_train, y_train, normalize=True)
-                    y_hat = linearreg.predict_(X_test, y_test)
-                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
-                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
-                    mean_rmse = np.mean(rmse_values)
+                    if path is None:
+                        linearreg = LinearRegressor(
+                            X.shape,
+                            fh,
+                            self.feature_list,
+                            regressor_type=self.sequence_regressor,
+                            alpha=self.sequence_alpha,
+                        )
+                        linearreg.train(X_train, y_train, normalize=True)
+                        y_hat = linearreg.predict_(X_test, y_test)
+                    else:
+                        y_hat = np.load(path)
+
+                    y_true = np.load(self.era_path)
+                    y_diff = y_hat - y_true
+                    y_diff = np.mean(y_diff, axis=0)
+                    for i in range(len(self.feature_list)):
+                        self.map_error[self.feature_list[i]] = y_diff[i]
                 elif self.baseline_type == "lgbm":
-                    regressor = GradBooster(X.shape, fh, self.feature_list)
-                    regressor.train(X_train, y_train, normalize=True)
-                    y_hat = regressor.predict_(X_test, y_test)
-                    rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
-                    rmse_not_normalized = regressor.get_rmse(y_hat, y_test, normalize=False)
-                    mean_rmse = np.mean(rmse_values)
+                    if path is None:
+                        regressor = GradBooster(X.shape, fh, self.feature_list)
+                        regressor.train(X_train, y_train, normalize=True)
+                        y_hat = regressor.predict_(X_test, y_test)
+                    else:
+                        y_hat = np.load(path)
+                    
+                    y_true = np.load(self.era_path)
+                    y_diff = y_hat - y_true
+                    y_diff = np.mean(y_diff, axis=0)
+                    for i in range(len(self.feature_list)):
+                        self.map_error[self.feature_list[i]] = y_diff[i]
                 elif self.baseline_type == "gnn":
-                    cfg.FH  = fh
-                    cfg.INPUT_SIZE = self.best_s
-                    trainer.update_config(cfg)
-                    trainer.train(num_epochs=self.num_epochs)
-                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
-                    rmse_values = rmse_values[0]
-                    # rmse_values, _ = trainer.autoreg_evaluate("test", fh=fh, verbose=False)                    
-                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
-                    rmse_not_normalized = rmse_not_normalized[0]
-                    mean_rmse = np.mean(rmse_values)
-
-                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_fh_{fh}.pt")
-
-                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt")
-
-                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt")
+                    if path is None:
+                        cfg.FH  = fh
+                        cfg.INPUT_SIZE = self.best_s
+                        cfg.GRAPH_CELLS = self.best_layer
+                        trainer.update_config(cfg)
+                        trainer.train(num_epochs=self.num_epochs)
+                        rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
+                        rmse_values = rmse_values[0]
+                        # rmse_values, _ = trainer.autoreg_evaluate("test", fh=fh, verbose=False)                    
+                        rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
+                        rmse_not_normalized = rmse_not_normalized[0]
+                    else:
+                        y_hat_not_normalized = np.load(path)
+                    
+                    y_true = np.load(self.era_path)
+                    y_diff = y_hat_not_normalized - y_true
+                    y_diff = np.mean(y_diff, axis=0)
+                    for i in range(len(self.feature_list)):
+                        self.map_error[self.feature_list[i]] = y_diff[i]
 
 
                 elif self.baseline_type == "cnn":
                     # trainer = CNNTrainer(subset=self.subset)
-                    cfg.FH  = fh
-                    cfg.INPUT_SIZE = self.best_s
-                    trainer.update_config(cfg)
-                    trainer.train(self.num_epochs)
-                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
-                    rmse_values = rmse_values[0]
-                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
-                    rmse_not_normalized = rmse_not_normalized[0]
-                    mean_rmse = np.mean(rmse_values)
+                    if path is None:
+                        cfg.FH  = fh
+                        cfg.INPUT_SIZE = self.best_s
+                        trainer.update_config(cfg)
+                        trainer.train(self.num_epochs)
+                        rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
+                        rmse_values = rmse_values[0]
+                        rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
+                        rmse_not_normalized = rmse_not_normalized[0]
+                        mean_rmse = np.mean(rmse_values)
+                    
+                    else:
+                        y_hat_not_normalized = np.load(path)
+                    
+                    y_true = np.load(self.era_path)
+                    y_diff = y_hat_not_normalized - y_true
+                    y_diff = np.mean(y_diff, axis=0)
+                    for i in range(len(self.feature_list)):
+                        self.map_error[self.feature_list[i]] = y_diff[i]
 
 
-                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_fh_{fh}.pt")
-
-                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt")
-
-                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt")
                 else:
                     raise InvalidBaselineException
                 
                 end_time = time.time()
 
-                self.fh_plot_x.append(fh)
-                self.fh_plot_y.append(mean_rmse)
-
-                self.not_normalized_plot_fh[fh] = rmse_not_normalized
-
-                execution_time = end_time - start_time
-                self.fh_plot_time.append(execution_time)
-
-                if mean_rmse < max_rmse:
-                    max_rmse = mean_rmse
-                    best_fh = fh
-
-                printProgressBar(fh, self.fh_n_trials + 1, prefix = 'Forcasting Horizon Progress:', suffix = 'Complete', length = 50)
-
-            self.best_fh = best_fh
+                printProgressBar(fh, self.fh_n_trials + 1, prefix = 'Error Map Progress:', suffix = 'Complete', length = 50)
 
         except InvalidBaselineException:
             print(

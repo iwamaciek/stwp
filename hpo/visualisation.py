@@ -13,6 +13,15 @@ class Visualization:
         self.plots_data = {}
         self.feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
 
+
+        self.colors = {
+            "simple-linear": "red",
+            "linear": "yellow",
+            "lgbm": "green",
+            "gnn": "blue",
+            "cnn": "black",
+        }
+
     def read_plots_from_json(self, file_name="modelsplots.json"):
         try:
             with open(file_name, "r") as infile:
@@ -54,7 +63,7 @@ class Visualization:
 
         return table
     
-    def plot_not_normalized_data_sequence(self, for_features=False):
+    def plot_not_normalized_data_sequence(self, for_features=False, one_plot=False):
         if for_features == False:
             # Iterate over each baseline_type and plot the data
             for i, baseline_type in enumerate(self.plots_data.keys()):
@@ -71,6 +80,7 @@ class Visualization:
                     list(not_normalized_plot_sequence.keys()),
                     list(not_normalized_plot_sequence.values()),
                     "-o",
+                    # color=self.colors[baseline_type],
                 )
 
                 # Set the title and legend for each subplot
@@ -84,6 +94,48 @@ class Visualization:
 
                     # Show the plot for each baseline_type
                 plt.show()
+        elif one_plot == True and for_features == True:
+            num_plots = len(self.plots_data)
+            num_cols = 2  # Number of columns in the grid
+            num_rows = (
+                num_plots + num_cols - 1
+            ) // num_cols  # Number of rows in the grid
+            fig, axes = plt.subplots(num_rows, num_cols, figsize=(12, 18))
+            # initialize data structures
+            baselines = []
+            plot_dict = {}
+            for feature in self.feature_list:
+                plot_dict[feature] = []
+            
+            # transform data fromat from features per baseline to baselines per feature
+            for i, baseline_type in enumerate(self.plots_data.keys()):
+                for_feature_dict = {}
+                baselines.append(baseline_type)
+
+                for feature in self.feature_list:
+                    for_feature_dict[feature] = []
+
+                if "not_normalized_plot_sequence" in self.plots_data[baseline_type]:
+                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_sequence"]
+
+                    for i, feature in enumerate(self.feature_list):
+                        for key in not_normalized_plot_sequence.keys():
+                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
+                    
+                    for feature in self.feature_list:
+                        plot_dict[feature].append(for_feature_dict[feature])
+
+            # plot the transformed data
+            for j, feature in enumerate(self.feature_list):
+                row = j // num_cols
+                col = j %num_cols
+                for i in range(len(baselines)):
+                    axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
+                    axes[row, col].set_title(f"Not Normalized Data Sequence Length - {feature}", fontsize=10)
+                    axes[row, col].legend(baselines, fontsize=8)
+                    axes[row, col].set_xlabel("Sequence Length", fontsize=8)
+                    axes[row, col].set_ylabel("Rmse", fontsize=8)
+            plt.show()
         else:
             # initialize data structures
             baselines = []
@@ -122,7 +174,7 @@ class Visualization:
                 plt.show()
 
 
-    def plot_not_normalized_data_fh(self, for_features=False):
+    def plot_not_normalized_data_fh(self, for_features=False, one_plot=False):
         if for_features == False:
         # Iterate over each baseline_type and plot the data
             for i, baseline_type in enumerate(self.plots_data.keys()):
@@ -153,6 +205,48 @@ class Visualization:
 
                     # Show the plot for each baseline_type
                 plt.show()
+        elif one_plot == True and for_features == True:
+            num_plots = len(self.plots_data)
+            num_cols = 2  # Number of columns in the grid
+            num_rows = (
+                num_plots + num_cols - 1
+            ) // num_cols  # Number of rows in the grid
+            fig, axes = plt.subplots(num_rows, num_cols, figsize=(12, 18))
+            # initialize data structures
+            baselines = []
+            plot_dict = {}
+            for feature in self.feature_list:
+                plot_dict[feature] = []
+            
+            # transform data fromat from features per baseline to baselines per feature
+            for i, baseline_type in enumerate(self.plots_data.keys()):
+                for_feature_dict = {}
+                baselines.append(baseline_type)
+
+                for feature in self.feature_list:
+                    for_feature_dict[feature] = []
+
+                if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
+                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_fh"]
+
+                    for i, feature in enumerate(self.feature_list):
+                        for key in not_normalized_plot_sequence.keys():
+                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
+                    
+                    for feature in self.feature_list:
+                        plot_dict[feature].append(for_feature_dict[feature])
+
+            # plot the transformed data
+            for j, feature in enumerate(self.feature_list):
+                row = j // num_cols
+                col = j %num_cols
+                for i in range(len(baselines)):
+                    axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
+                    axes[row, col].set_title(f"Not Normalized Data Forcasting Horizon - {feature}", fontsize=10)
+                    axes[row, col].legend(baselines, fontsize=8)
+                    axes[row, col].set_xlabel("Forcasting Horizon", fontsize=8)
+                    axes[row, col].set_ylabel("Rmse", fontsize=8)
+            plt.show()
         else:
             # initialize data structures
             baselines = []
@@ -202,7 +296,7 @@ class Visualization:
                 sequence_plot_y = self.plots_data[baseline_type]["sequence_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(sequence_plot_x, sequence_plot_y, "-o", label=baseline_type)
+                ax.plot(sequence_plot_x, sequence_plot_y, "-o", label=baseline_type, color=self.colors[baseline_type])
                 ax.set_xlabel("Sequence Length")
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
@@ -232,7 +326,7 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(sequence_plot_x, sequence_plot_y, "-o")
+                axes[row, col].plot(sequence_plot_x, sequence_plot_y, "-o", color=self.colors[baseline_type])
                 axes[row, col].set_title(
                     baseline_type
                 )  # Set the title as the baseline_type
@@ -261,7 +355,7 @@ class Visualization:
 
                     # Plot the data on the single plot
                     ax.plot(
-                        sequence_plot_x, sequence_plot_time, "-o", label=baseline_type
+                        sequence_plot_x, sequence_plot_time, "-o", label=baseline_type, color=self.colors[baseline_type]
                     )
 
             # Set the title and legend
@@ -287,7 +381,7 @@ class Visualization:
 
                     # Plot the data on the single plot
                     ax.plot(
-                        sequence_plot_x, sequence_plot_time, "-o", label=baseline_type
+                        sequence_plot_x, sequence_plot_time, "-o", label=baseline_type, color=self.colors[baseline_type]
                     )
 
             # Set the title and legend
@@ -320,7 +414,7 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(sequence_plot_x, sequence_plot_time, "-o")
+                axes[row, col].plot(sequence_plot_x, sequence_plot_time, "-o", color=self.colors[baseline_type])
                 axes[row, col].set_title(
                     baseline_type
                 )  # Set the title as the baseline_type
@@ -345,7 +439,7 @@ class Visualization:
                 fh_plot_y = self.plots_data[baseline_type]["fh_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(fh_plot_x, fh_plot_y, "-o", label=baseline_type)
+                ax.plot(fh_plot_x, fh_plot_y, "-o", label=baseline_type, color=self.colors[baseline_type])
 
             # Set the title and legend
             ax.set_title("Data FH")
@@ -375,7 +469,7 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(fh_plot_x, fh_plot_y, "-o")
+                axes[row, col].plot(fh_plot_x, fh_plot_y, "-o", color=self.colors[baseline_type])
                 axes[row, col].set_title(
                     baseline_type
                 )  # Set the title as the baseline_type
@@ -404,7 +498,7 @@ class Visualization:
                 ind = np.arange(max(month_plot_x))
                 if len(month_plot_y) == 12:
                     
-                    ax.bar(ind+width*i, month_plot_y, width, label=baseline_type)
+                    ax.bar(ind+width*i, month_plot_y, width, label=baseline_type, color=self.colors[baseline_type])
                     i+=1
 
             # Set the title and legend
@@ -431,7 +525,7 @@ class Visualization:
                 fh_plot_time = self.plots_data[baseline_type]["fh_plot_time"]
 
                 # Plot the data on the single plot
-                ax.plot(fh_plot_x, fh_plot_time, "-o", label=baseline_type)
+                ax.plot(fh_plot_x, fh_plot_time, "-o", label=baseline_type, color=self.colors[baseline_type])
 
             # Set the title and legend
             ax.set_title("Data FH Time")
@@ -461,7 +555,7 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(fh_plot_x, fh_plot_time, "-o")
+                axes[row, col].plot(fh_plot_x, fh_plot_time, "-o", color=self.colors[baseline_type])
                 axes[row, col].set_title(
                     baseline_type
                 )  # Set the title as the baseline_type
@@ -484,7 +578,7 @@ class Visualization:
                 alpha_plot_y = self.plots_data[baseline_type]["gnn_alpha_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(alpha_plot_x, alpha_plot_y, "-o", label=baseline_type)
+                ax.plot(alpha_plot_x, alpha_plot_y, "-o", label=baseline_type, color=self.colors[baseline_type])
                 ax.set_xlabel("Alpha")
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
@@ -506,7 +600,7 @@ class Visualization:
                 cell_plot_y = self.plots_data[baseline_type]["gnn_cell_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(cell_plot_x, cell_plot_y, "-o", label=baseline_type)
+                ax.plot(cell_plot_x, cell_plot_y, "-o", label=baseline_type, color=self.colors[baseline_type])
                 ax.set_xlabel("Number of Graph Cells")
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 

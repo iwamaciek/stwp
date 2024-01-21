@@ -802,6 +802,8 @@ class HPO:
             "month_error": self.month_error,
             "gnn_alpha_plot_x": self.gnn_alpha_plot_x,
             "gnn_alpha_plot_y": self.gnn_alpha_plot_y,
+            "gnn_cell_plot_x": self.gnn_cell_plot_x,
+            "gnn_cell_plot_y": self.gnn_cell_plot_y,
         }
 
         # Write data to file
@@ -1100,6 +1102,8 @@ class HPO:
     def gnn_layer(self):
         trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
         for cell in range(2, 10):
+            cfg.FH = self.fh
+            cfg.INPUT_SIZE = self.best_s
             cfg.GRAPH_CELLS = cell
             trainer.update_config(cfg)
             trainer.train(num_epochs=self.num_epochs)

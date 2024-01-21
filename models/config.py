@@ -5,7 +5,7 @@ class Config:
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     TRAIN_RATIO = 1 / 3
     BATCH_SIZE = 8
-    FH = 2
+    FH = 1
     # AUTOREG_FH = None
     INPUT_SIZE = 5
     R = 2

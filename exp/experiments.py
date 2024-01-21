@@ -30,6 +30,15 @@ class Analyzer:
         self.get_era5()
         self.calculate_errors()
 
+    def coherent_tensors(self):
+        self.min_length = min(
+            self.pred_dir[model].shape[0] for model in self.pred_dir if model != "tigge"
+        )
+        for model, pred_tensor in self.pred_dir.items():
+            if model != "tigge":
+                self.pred_dir[model] = pred_tensor[-self.min_length :]
+        self.era5 = self.era5[-self.min_length :]
+
     def get_pred_tensors(self, path="../data/pred/"):
         for model in os.listdir(path):
             p = os.path.join(path, model)

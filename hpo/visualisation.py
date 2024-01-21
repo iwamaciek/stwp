@@ -502,8 +502,8 @@ class Visualization:
         # Iterate over each baseline_type and plot the data
         for baseline_type in self.plots_data.keys():
             if baseline_type == "gnn":
-                cell_plot_x = self.plots_data[baseline_type]["gnn_cells_plot_x"]
-                cell_plot_y = self.plots_data[baseline_type]["gnn_cells_plot_y"]
+                cell_plot_x = self.plots_data[baseline_type]["gnn_cell_plot_x"]
+                cell_plot_y = self.plots_data[baseline_type]["gnn_cell_plot_y"]
 
                 # Plot the data on the single plot
                 ax.plot(cell_plot_x, cell_plot_y, "-o", label=baseline_type)

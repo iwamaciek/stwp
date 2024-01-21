@@ -1116,11 +1116,11 @@ class HPO:
             self.gnn_cell_plot_y.append(mean_rmse)
 
 
-            torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_cells_{cell}.pt")
+            torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_cell_{cell}.pt")
 
-            trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_cells_{cell}_norm.pt")
+            trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_cell_{cell}_norm.pt")
 
-            trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_cells_{cell}_real.pt")
+            trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_cell_{cell}_real.pt")
 
 
 

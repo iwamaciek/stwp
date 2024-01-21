@@ -21,6 +21,7 @@ class Analyzer:
         self.df_pred = None
         self.scalers = None
         self.nn_proc = None
+        self.min_length = None
         self.feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
 
     def init(self):
@@ -38,10 +39,46 @@ class Analyzer:
                     self.pred_dir[model.split("_2024")[0]] = pred_tensor
                 else:
                     self.pred_dir[model.split("_2024")[0]] = pred_tensor[..., 0]  # fh=1
+        self.min_length = min(
+            self.pred_dir[model].shape[0] for model in self.pred_dir if model != "tigge"
+        )
 
     def get_era5(self):
         processor = DataProcessor(path="../data/input/data2021-small.grib")
         self.era5 = processor.data
+
+    def generate_full_metrics(self, verbose=False, latex=True):
+        rmse_results, mae_results = [], []
+        models = []
+        for model, predictions in self.pred_dir.items():
+            if "tigge" in model:
+                rmse_per_model, mae_per_model = self.calculate_metrics(
+                    predictions, self.era5[1::2], verbose=verbose
+                )
+            else:
+                rmse_per_model, mae_per_model = self.calculate_metrics(
+                    predictions[-self.min_length :], self.era5, verbose=verbose
+                )
+            if verbose:
+                print(f"Model: {model}\n\n")
+            models.append(" ".join(model.split("_")))
+            rmse_results.append(rmse_per_model)
+            mae_results.append(mae_per_model)
+        rmse_results = np.array(rmse_results)
+        mae_results = np.array(mae_results)
+        rmse_df = pd.DataFrame(rmse_results, columns=self.feature_list, index=models)
+        mae_df = pd.DataFrame(mae_results, columns=self.feature_list, index=models)
+        if latex:
+            print(
+                rmse_df.to_latex(
+                    float_format="%.3f", caption="RMSE Results", label="tab:rmse"
+                )
+            )
+            print(
+                mae_df.to_latex(
+                    float_format="%.3f", caption="MAE Results", label="tab:mae"
+                )
+            )
 
     def get_scalers(self):
         if self.nn_proc is None:
@@ -53,13 +90,15 @@ class Analyzer:
 
     def calculate_errors(self):
         for model, pred_tensor in self.pred_dir.items():
-            if "tigge" not in str(model):
+            print(model)
+            if model != "tigge":
                 self.er_dir[model] = np.zeros_like(
                     self.era5,
                 )
                 for i in range(len(self.feature_list)):
                     self.er_dir[model][..., i] = (
-                        self.era5[..., i] - pred_tensor[1:, ..., i]
+                        self.era5[-self.min_length :, ..., i]
+                        - pred_tensor[-self.min_length :, ..., i]
                     )
             # else:
             #     self.er_dir[model] = np.zeros_like(self.era5[1::2])
@@ -70,7 +109,7 @@ class Analyzer:
     def plot_err_corr_matrix(self, save=False):
         fig, axs = plt.subplots(2, 3, figsize=(15, 10))
         divider = fig.add_axes([1.05, 0.15, 0.02, 0.8])  # (left, bottom, width, height)
-        vmin, vmax = np.inf, -np.inf  # Initialize vmin and vmax for colorbar scaling
+        vmin, vmax = 1, -1
         for i, (feature, ax) in enumerate(zip(self.feature_list, axs.flatten())):
             ax.set_title(feature)
             df_err = pd.DataFrame(
@@ -115,7 +154,7 @@ class Analyzer:
             key: value for key, value in self.pred_dir.items() if key != "tigge"
         }
         divider = fig.add_axes([1.05, 0.15, 0.02, 0.8])  # (left, bottom, width, height)
-        vmin, vmax = np.inf, -np.inf  # Initialize vmin and vmax for colorbar scaling
+        vmin, vmax = 1, -1
         for i, (feature, ax) in enumerate(zip(self.feature_list, axs.flatten())):
             ax.set_title(feature)
             df_pred = pd.DataFrame(

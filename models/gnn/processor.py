@@ -24,8 +24,10 @@ class NNDataProcessor:
         temporal_encoding=False,
         additional_encodings=False,
         test_shuffle=True,
+        path=cfg.DATA_PATH,
     ):
         self.data_proc = DataProcessor(
+            path=path,
             spatial_encoding=spatial_encoding,
             temporal_encoding=temporal_encoding,
             additional_encodings=additional_encodings,
@@ -321,7 +323,7 @@ class NNDataProcessor:
         up_lon = lon_diff // 2
         down_lon = new_lon + lon_diff - up_lon - 1
 
-        mapped_tensor = input_tensor[:, left_lat:right_lat, up_lon:down_lon]
+        mapped_tensor = input_tensor[:, left_lat:right_lat, lon_diff:]
         mapped_tensor.reshape(-1, self.num_features, mapped_tensor.shape[4])
 
         return mapped_tensor

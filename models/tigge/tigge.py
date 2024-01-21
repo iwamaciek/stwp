@@ -1,6 +1,7 @@
 import cfgrib
 import numpy as np
 import sys
+from datetime import datetime
 
 sys.path.append("../..")
 from models.baseline_regressor import BaselineRegressor
@@ -50,7 +51,6 @@ def load_tigge_0_to_12_by_6(grib_file):
             u10_step_12,
             v10_step_12,
             tp_step_12,
-            sp_step_12,
         ),
         axis=-1,
     )
@@ -62,9 +62,17 @@ def evaluate_and_compare(data1, data2, max_samples=1):
     feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
 
     X, Y = data1[..., np.newaxis, :], data2[..., np.newaxis, :]
-    data1_regressor = BaselineRegressor(X.shape, 1, feature_list)
-    data1_regressor.plot_predictions(X, Y, max_samples=max_samples)
-    rmse_scores, mae_scores = data1_regressor.evaluate(X, Y)
+    reg = BaselineRegressor(X.shape, 1, feature_list)
+    reg.plot_predictions(X, Y, max_samples=max_samples)
+    rmse_scores, mae_scores = reg.evaluate(X, Y)
 
     for i in range(len(feature_list)):
         print(f"{feature_list[i]} => RMSE: {rmse_scores[i]};  MAE: {mae_scores[i]};")
+
+
+def save_prediction_tensor(y_hat, path=None):
+    if path is None:
+        t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    name = "tigge"
+    path = f"../data/pred/{name}_{t}.npy"
+    np.save(path, y_hat)

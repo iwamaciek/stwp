@@ -7,7 +7,7 @@ class Config:
     BATCH_SIZE = 8
     FH = 1
     # AUTOREG_FH = None
-    INPUT_SIZE = 5
+    INPUT_SIZE = 6
     R = 2
     GRAPH_CELLS = 5
     SCALER_TYPE = "standard"

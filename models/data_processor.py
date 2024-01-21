@@ -16,6 +16,7 @@ class DataProcessor:
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        path=cfg.DATA_PATH,
     ):
         self.num_spatial_constants, self.num_temporal_constants = 0, 0
         self.temporal_encoding = temporal_encoding or additional_encodings
@@ -26,6 +27,7 @@ class DataProcessor:
             self.temporal_data,
             self.spatial_data,
         ) = self.load_data(
+            path=path,
             spatial_encoding=self.spatial_encoding,
             temporal_encoding=self.temporal_encoding,
         )

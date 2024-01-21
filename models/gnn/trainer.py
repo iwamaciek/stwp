@@ -117,7 +117,9 @@ class Trainer:
         # self.model = torch.compile(self.model)
 
     def init_train_details(self):
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.lr, weight_decay=1e-4
+        )
         self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
         self.early_stop_callback = EarlyStoppingCallback()
@@ -540,6 +542,12 @@ class Trainer:
             t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             path = f"../data/pred/{self.architecture}_{t}.npy"
         np.save(path, y_hat)
+
+    def calculate_model_params(self):
+        params = 0
+        for p in self.model.parameters():
+            params += p.reshape(-1).shape[0]
+        print(f"Model parameters: {params}")
 
     @staticmethod
     def clip_total_cloud_cover(y_hat, idx=2):

@@ -387,7 +387,7 @@ class Trainer:
         prediction_time = X.time
         prediction_day = trig_decode(prediction_time[0].item(), prediction_time[1].item(), 365)
         prediction_hour = trig_decode(prediction_time[2].item(), prediction_time[3].item(), 24)
-        prediction_date = datetime(year=2024, month=1, day=1, hour=prediction_hour) + timedelta(days=prediction_day-1)
+        prediction_date = datetime(year=2024, month=1, day=1, hour=prediction_hour) + timedelta(days=prediction_day)
 
         for i, lat in enumerate(lat_span):
             json_data[str(lat)] = {}

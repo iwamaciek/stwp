@@ -16,4 +16,6 @@ COPY ./model /model
 
 COPY ./.cdsapirc /root/
 
+ENV TZ=Europe/Warsaw
+
 CMD ["python", "main.py"]

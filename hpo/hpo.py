@@ -98,6 +98,10 @@ class HPO:
         self.gnn_alpha_plot_x = []
         self.gnn_alpha_plot_y = []
 
+
+        self.gnn_cell_plot_x = []
+        self.gnn_cell_plot_y = []
+
     def run_hpo(self):
         return -1
 
@@ -958,3 +962,144 @@ class HPO:
             printProgressBar(alpha, 1, prefix = 'Alpha Progress:', suffix = 'Complete', length = 50)
 
         self.best_alpha = best_alpha
+
+
+
+    def gnn_layer(self):
+        trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
+        for cell in range(2, 10):
+            cfg.GRAPH_CELLS = cell
+            trainer.update_config(cfg)
+            trainer.train(num_epochs=self.num_epochs)
+            rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
+            rmse_values = rmse_values[0]
+            rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
+            rmse_not_normalized = rmse_not_normalized[0]
+            mean_rmse = np.mean(rmse_values)
+            self.gnn_cell_plot_x.append(cell)
+            self.gnn_cell_plot_y.append(mean_rmse)
+
+
+            torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_cells_{cell}.pt")
+
+            trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_cells_{cell}_norm.pt")
+
+            trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_cells_{cell}_real.pt")
+
+
+
+    def error_maps(self):
+        try:
+            self.clear_fh_plot()
+            best_fh = 0
+            max_rmse = np.inf
+            printProgressBar(0, self.sequence_n_trials + 1, prefix = ' Forcasting Horizon Progress:', suffix = 'Complete', length = 50)
+
+            if self.baseline_type == 'gnn':
+                trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
+            elif self.baseline_type == 'cnn':
+                trainer = CNNTrainer(subset=self.subset, test_shuffle=False)
+
+            for fh in range(1, self.fh_n_trials + 1):
+                # processor = DataProcessor(self.data)
+                self.processor.upload_data(self.data)
+                X, y = self.processor.preprocess(self.best_s,fh, self.use_neighbours)
+                X_train, X_test, y_train, y_test = self.processor.train_val_test_split(X, y)
+                start_time = time.time()
+                if self.baseline_type == "simple-linear":
+                    linearreg = SimpleLinearRegressor(
+                        X.shape,
+                        fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+
+                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
+                    mean_rmse = np.mean(rmse_values)
+
+                elif self.baseline_type == "linear":
+                    linearreg = LinearRegressor(
+                        X.shape,
+                        fh,
+                        self.feature_list,
+                        regressor_type=self.sequence_regressor,
+                        alpha=self.sequence_alpha,
+                    )
+                    linearreg.train(X_train, y_train, normalize=True)
+                    y_hat = linearreg.predict_(X_test, y_test)
+                    rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = linearreg.get_rmse(y_hat, y_test, normalize=False)
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "lgbm":
+                    regressor = GradBooster(X.shape, fh, self.feature_list)
+                    regressor.train(X_train, y_train, normalize=True)
+                    y_hat = regressor.predict_(X_test, y_test)
+                    rmse_values = regressor.get_rmse(y_hat, y_test, normalize=True)
+                    rmse_not_normalized = regressor.get_rmse(y_hat, y_test, normalize=False)
+                    mean_rmse = np.mean(rmse_values)
+                elif self.baseline_type == "gnn":
+                    cfg.FH  = fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(num_epochs=self.num_epochs)
+                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
+                    rmse_values = rmse_values[0]
+                    # rmse_values, _ = trainer.autoreg_evaluate("test", fh=fh, verbose=False)                    
+                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
+                    rmse_not_normalized = rmse_not_normalized[0]
+                    mean_rmse = np.mean(rmse_values)
+
+                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_fh_{fh}.pt")
+
+                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt")
+
+                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt")
+
+
+                elif self.baseline_type == "cnn":
+                    # trainer = CNNTrainer(subset=self.subset)
+                    cfg.FH  = fh
+                    cfg.INPUT_SIZE = self.best_s
+                    trainer.update_config(cfg)
+                    trainer.train(self.num_epochs)
+                    rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
+                    rmse_values = rmse_values[0]
+                    rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
+                    rmse_not_normalized = rmse_not_normalized[0]
+                    mean_rmse = np.mean(rmse_values)
+
+
+                    torch.save(trainer.model.state_dict(), f"./model_state_{self.baseline_type}_fh_{fh}.pt")
+
+                    trainer.save_prediction_tensor(y_hat_normalized, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_norm.pt")
+
+                    trainer.save_prediction_tensor(y_hat_real, f"./prediction_tensor_{self.baseline_type}_fh_{fh}_real.pt")
+                else:
+                    raise InvalidBaselineException
+                
+                end_time = time.time()
+
+                self.fh_plot_x.append(fh)
+                self.fh_plot_y.append(mean_rmse)
+
+                self.not_normalized_plot_fh[fh] = rmse_not_normalized
+
+                execution_time = end_time - start_time
+                self.fh_plot_time.append(execution_time)
+
+                if mean_rmse < max_rmse:
+                    max_rmse = mean_rmse
+                    best_fh = fh
+
+                printProgressBar(fh, self.fh_n_trials + 1, prefix = 'Forcasting Horizon Progress:', suffix = 'Complete', length = 50)
+
+            self.best_fh = best_fh
+
+        except InvalidBaselineException:
+            print(
+                "Exception occurred: Invalid Baseline, choose between 'linear' , 'simple-linear', 'lgbm', 'gnn' and 'cnn'"
+            )   

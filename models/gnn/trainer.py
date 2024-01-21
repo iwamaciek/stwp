@@ -314,6 +314,71 @@ class Trainer:
 
         self.calculate_metrics(y_hat, y)
 
+    def plot_error_heatmap(self,  data_type="test", pretty=False):
+        if data_type == "train":
+            sample = next(iter(self.train_loader))
+        elif data_type == "test":
+            sample = next(iter(self.test_loader))
+        elif data_type == "val":
+            sample = next(iter(self.val_loader))
+        else:
+            print("Invalid type: (train, test, val)")
+            raise ValueError
+
+        if pretty:
+            lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
+            spatial = {
+                "lat_span": lat_span,
+                "lon_span": lon_span,
+                "spatial_limits": spatial_limits,
+            }
+
+        X, y = sample.x, sample.y
+        y, y_hat = self.predict(
+            X, y, sample.edge_index, sample.edge_attr, sample.pos, sample.time
+        )
+        latitude, longitude = self.latitude, self.longitude
+
+        if self.spatial_mapping:
+            y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
+            y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
+            latitude, longitude = y_hat.shape[1:3]
+
+        for i in range(self.cfg.BATCH_SIZE):
+            if pretty:
+                fig, axs = plt.subplots(
+                    self.features,
+                    self.cfg.FH,
+                    figsize=(10 * self.cfg.FH, self.features),
+                    subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
+                )
+            else:
+                fig, ax = plt.subplots(
+                    self.features,
+                    self.cfg.FH,
+                    figsize=(10 * self.cfg.FH, self.features),
+                )
+
+            for j, feature_name in enumerate(self.feature_list):
+                for k in range(self.cfg.FH):
+                    ts = k
+                    if pretty:
+                        ax = axs[j]
+
+                    title = rf"$|X - \hat{{X}}|_{{{feature_name},t+{ts + 1}}}$"
+                    value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
+                    cmap = "binary"
+
+                    if pretty:
+                        draw_poland(ax, value, title, cmap, **spatial)
+                    else:
+                        pl = ax[j].imshow(
+                            value.reshape(latitude, longitude), cmap=cmap
+                        )
+                        ax[j, k].set_title(title)
+                        ax[j, k].axis("off")
+                        _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+
     def evaluate(self, data_type="test", verbose=True, inverse_norm=True, begin=None, end=None):
         if data_type == "train":
             loader = self.train_loader

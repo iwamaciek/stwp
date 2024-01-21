@@ -64,51 +64,125 @@ class Visualization:
 
         return table
     
-    def plot_not_normalized_data_sequence(self):
-        # Iterate over each baseline_type and plot the data
-        for i, baseline_type in enumerate(self.plots_data.keys()):
-            # Check if the baseline_type has the "not_normalized_plot_sequence" field
-            if "not_normalized_plot_sequence" in self.plots_data[baseline_type]:
-                # Create a new plot for each baseline_type
-                fig, ax = plt.subplots(figsize=(10, 8))
+    def plot_not_normalized_data_sequence(self, for_features=False):
+        if for_features == False:
+            # Iterate over each baseline_type and plot the data
+            for i, baseline_type in enumerate(self.plots_data.keys()):
+                # Check if the baseline_type has the "not_normalized_plot_sequence" field
+                if "not_normalized_plot_sequence" in self.plots_data[baseline_type]:
+                    # Create a new plot for each baseline_type
+                    fig, ax = plt.subplots(figsize=(10, 8))
 
-                # Get the not_normalized_plot_sequence for the current baseline_type
-                not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_sequence"]
+                    # Get the not_normalized_plot_sequence for the current baseline_type
+                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_sequence"]
 
-                # Plot the data on the single plot
-                ax.plot(list(not_normalized_plot_sequence.keys()), list(not_normalized_plot_sequence.values()))
+                    # Plot the data on the single plot
+                    ax.plot(list(not_normalized_plot_sequence.keys()), list(not_normalized_plot_sequence.values()))
 
-                # Set the title and legend for each plot
-                ax.set_title(f"Not Normalized Data Sequence - {baseline_type}")
-                ax.legend(self.feature_list)
+                    # Set the title and legend for each plot
+                    ax.set_title(f"Not Normalized Data Sequence - {baseline_type}")
+                    ax.legend(self.feature_list)
+                    ax.set_xlabel("Sequence Length")
+                    ax.set_ylabel("Rmse")
+
+                    # Show the plot for each baseline_type
+                    plt.show()
+        else:
+            # initialize data structures
+            baselines = []
+            plot_dict = {}
+            for feature in self.feature_list:
+                plot_dict[feature] = []
+            
+            # transform data fromat from features per baseline to baselines per feature
+            for i, baseline_type in enumerate(self.plots_data.keys()):
+                for_feature_dict = {}
+                baselines.append(baseline_type)
+
+                for feature in self.feature_list:
+                    for_feature_dict[feature] = []
+
+                if "not_normalized_plot_sequence" in self.plots_data[baseline_type]:
+                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_sequence"]
+
+                    for i, feature in enumerate(self.feature_list):
+                        for key in not_normalized_plot_sequence.keys():
+                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
+                
+                    for feature in self.feature_list:
+                        plot_dict[feature].append(for_feature_dict[feature])
+
+
+            # plot the transformed data
+            for feature in self.feature_list:
+                fig, ax = plt.subplots(figsize=(10, 8)) 
+                for i in range(len(baselines)):
+                    ax.plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i])
+                    ax.set_title(f"Not Normalized Data Sequence - {feature}")
+                ax.legend(baselines)
                 ax.set_xlabel("Sequence Length")
                 ax.set_ylabel("Rmse")
-
-                # Show the plot for each baseline_type
                 plt.show()
 
 
-    def plot_not_normalized_data_fh(self):
+    def plot_not_normalized_data_fh(self, for_features=False):
+        if for_features == False:
         # Iterate over each baseline_type and plot the data
-        for i, baseline_type in enumerate(self.plots_data.keys()):
-            # Check if the baseline_type has the "not_normalized_plot_sequence" field
-            if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
-                # Create a new plot for each baseline_type
-                fig, ax = plt.subplots(figsize=(10, 8))
+            for i, baseline_type in enumerate(self.plots_data.keys()):
+                # Check if the baseline_type has the "not_normalized_plot_sequence" field
+                if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
+                    # Create a new plot for each baseline_type
+                    fig, ax = plt.subplots(figsize=(10, 8))
 
-                # Get the not_normalized_plot_sequence for the current baseline_type
-                not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_fh"]
+                    # Get the not_normalized_plot_sequence for the current baseline_type
+                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_fh"]
 
-                # Plot the data on the single plot
-                ax.plot(list(not_normalized_plot_sequence.keys()), list(not_normalized_plot_sequence.values()))
+                    # Plot the data on the single plot
+                    ax.plot(list(not_normalized_plot_sequence.keys()), list(not_normalized_plot_sequence.values()))
 
-                # Set the title and legend for each plot
-                ax.set_title(f"Not Normalized Data Forcasting Horizon - {baseline_type}")
-                ax.legend(self.feature_list)
+                    # Set the title and legend for each plot
+                    ax.set_title(f"Not Normalized Data Forcasting Horizon - {baseline_type}")
+                    ax.legend(self.feature_list)
+                    ax.set_xlabel("Forcasting Horizon")
+                    ax.set_ylabel("Rmse")
+
+                    # Show the plot for each baseline_type
+                    plt.show()
+        else:
+            # initialize data structures
+            baselines = []
+            plot_dict = {}
+            for feature in self.feature_list:
+                plot_dict[feature] = []
+            
+            # transform data fromat from features per baseline to baselines per feature
+            for i, baseline_type in enumerate(self.plots_data.keys()):
+                for_feature_dict = {}
+                baselines.append(baseline_type)
+
+                for feature in self.feature_list:
+                    for_feature_dict[feature] = []
+
+                if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
+                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_fh"]
+
+                    for i, feature in enumerate(self.feature_list):
+                        for key in not_normalized_plot_sequence.keys():
+                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
+                    
+                    for feature in self.feature_list:
+                        plot_dict[feature].append(for_feature_dict[feature])
+
+
+            # plot the transformed data
+            for feature in self.feature_list:
+                fig, ax = plt.subplots(figsize=(10, 8)) 
+                for i in range(len(baselines)):
+                    ax.plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i])
+                    ax.set_title(f"Not Normalized Data Forcasting Horizon - {feature}")
+                ax.legend(baselines)
                 ax.set_xlabel("Forcasting Horizon")
                 ax.set_ylabel("Rmse")
-
-                # Show the plot for each baseline_type
                 plt.show()
 
     def plot_data_sequence(self, one_plot=False):

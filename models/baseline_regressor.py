@@ -2,6 +2,9 @@
 import numpy as np
 import copy
 import cartopy.crs as ccrs
+import os
+import sys
+sys.path.append("..")
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.dummy import DummyRegressor
@@ -313,6 +316,10 @@ class BaselineRegressor:
             t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             name = str(self.__class__).split(".")[-2]
             path = f"../data/pred/{name}_{t}.npy"
+        
+        if not os.path.exists(path):
+            with open(path, 'w') as f:
+                f.write("")
         np.save(path, y_hat.transpose(0, 1, 2, 4, 3))
 
     @staticmethod

@@ -3,6 +3,11 @@ import json
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import numpy as np
+import cartopy.crs as ccrs
+from utils.draw_functions import draw_poland
+from models.data_processor import DataProcessor
+import os
+
 
 plt.style.use("ggplot")
 sys.path.append("..")
@@ -22,10 +27,13 @@ class Visualization:
             "cnn": "black",
         }
 
+        self.error_maps = []
+
     def read_plots_from_json(self, file_name="modelsplots.json"):
         try:
             with open(file_name, "r") as infile:
                 self.plots_data = json.load(infile)
+
         except FileNotFoundError:
             pass
 
@@ -560,15 +568,37 @@ class Visualization:
 
             # Iterate over each baseline_type and plot the data
             for baseline_type in self.plots_data.keys():
-                # Get the fh_plot_x and fh_plot_time for the current baseline_type
-                fh_plot_x = self.plots_data[baseline_type]["fh_plot_x"]
-                fh_plot_time = self.plots_data[baseline_type]["fh_plot_time"]
+                if baseline_type in ["simple-linear", "linear", "lgbm"]:
+                    # Get the fh_plot_x and fh_plot_time for the current baseline_type
+                    fh_plot_x = self.plots_data[baseline_type]["fh_plot_x"]
+                    fh_plot_time = self.plots_data[baseline_type]["fh_plot_time"]
 
-                # Plot the data on the single plot
-                ax.plot(fh_plot_x, fh_plot_time, "-o", label=baseline_type, color=self.colors[baseline_type])
+                    # Plot the data on the single plot
+                    ax.plot(fh_plot_x, fh_plot_time, "-o", label=baseline_type, color=self.colors[baseline_type])
 
             # Set the title and legend
-            ax.set_title("Data FH Time")
+            ax.set_title("Data FH Time (Baselines)")
+            ax.legend()
+            ax.set_xlabel("Forcasting Horizon")
+            ax.set_ylabel("Time [s]")
+
+            # Show the plot
+            plt.show()
+
+            fig, ax = plt.subplots(figsize=(10, 8))
+
+            # Iterate over each baseline_type and plot the data
+            for baseline_type in self.plots_data.keys():
+                if baseline_type in ["gnn", "cnn"]:
+                    # Get the fh_plot_x and fh_plot_time for the current baseline_type
+                    fh_plot_x = self.plots_data[baseline_type]["fh_plot_x"]
+                    fh_plot_time = self.plots_data[baseline_type]["fh_plot_time"]
+
+                    # Plot the data on the single plot
+                    ax.plot(fh_plot_x, fh_plot_time, "-o", label=baseline_type, color=self.colors[baseline_type])
+
+            # Set the title and legend
+            ax.set_title("Data FH Time (Nets)")
             ax.legend()
             ax.set_xlabel("Forcasting Horizon")
             ax.set_ylabel("Time [s]")
@@ -650,3 +680,31 @@ class Visualization:
 
         # Show the plot
         plt.show()
+
+    def plot_error_maps(self):
+        for baseline_type in self.plots_data.keys():
+            if os.path.exists(f"./{baseline_type}/error_maps.npy"):
+                error_maps = np.load(f"./{baseline_type}/error_maps.npy")
+
+
+                lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
+                spatial = {
+                    "lat_span": lat_span,
+                    "lon_span": lon_span,
+                    "spatial_limits": spatial_limits,
+                }
+                fig, axs = plt.subplots(
+                len(self.feature_list),
+                # 1,
+                figsize=(10, 12),
+                subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
+                # constrained_layout=True
+                )
+                for j, feature_name in enumerate(self.feature_list):
+                    ax = axs[j]
+                    title = rf"$|(X - \hat{{X}})^2|_{{{feature_name}}}$"
+                    value = error_maps[j]
+                    cmap = "binary"
+                    draw_poland(ax, value, title, cmap, **spatial)
+                fig.suptitle(f"{baseline_type} error maps", x=0.7, y=0.95, weight="bold")
+                

@@ -221,6 +221,8 @@ class HPO:
                     print(rmse_not_normalized)
                     mean_rmse = np.mean(rmse_values)
 
+                    linearreg.save_prediction_tensor(y_hat)
+
                 elif self.baseline_type == "linear":
                     linearreg = LinearRegressor(
                         X.shape,
@@ -237,6 +239,7 @@ class HPO:
                         y_hat, y_test, normalize=False
                     )
                     mean_rmse = np.mean(rmse_values)
+                    linearreg.save_prediction_tensor(y_hat)
                 elif self.baseline_type == "lgbm":
                     regressor = GradBooster(X.shape, self.fh, self.feature_list)
                     regressor.train(X_train, y_train, normalize=True)
@@ -247,6 +250,7 @@ class HPO:
                         y_hat, y_test, normalize=False
                     )
                     mean_rmse = np.mean(rmse_values)
+                    regressor.save_prediction_tensor(y_hat)
                 elif self.baseline_type == "gnn":
                     cfg.FH = self.fh
                     cfg.INPUT_SIZE = s
@@ -520,6 +524,7 @@ class HPO:
                         y_hat, y_test, normalize=False
                     )
                     mean_rmse = np.mean(rmse_values)
+                    linearreg.save_prediction_tensor(y_hat)
 
                 elif self.baseline_type == "linear":
                     linearreg = LinearRegressor(
@@ -536,6 +541,7 @@ class HPO:
                         y_hat, y_test, normalize=False
                     )
                     mean_rmse = np.mean(rmse_values)
+                    linearreg.save_prediction_tensor(y_hat)
                 elif self.baseline_type == "lgbm":
                     regressor = GradBooster(X.shape, fh, self.feature_list)
                     regressor.train(X_train, y_train, normalize=True)
@@ -545,6 +551,7 @@ class HPO:
                         y_hat, y_test, normalize=False
                     )
                     mean_rmse = np.mean(rmse_values)
+                    regressor.save_prediction_tensor(y_hat)
                 elif self.baseline_type == "gnn":
                     cfg.FH = fh
                     cfg.INPUT_SIZE = self.best_s
@@ -741,6 +748,9 @@ class HPO:
                 y_hat = linearreg.predict_(X_test, y_test)
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=False)
                 mae_values = linearreg.get_mae(y_hat, y_test, normalize=False)
+                if not(os.path.isdir(f'./{self.baseline_type}')):
+                    os.mkdir(f'./{self.baseline_type}')
+                linearreg.save_prediction_tensor(y_hat, path=f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_best.pt")
             elif self.baseline_type == "linear":
                 linearreg = LinearRegressor(
                     X.shape, self.fh, self.feature_list, **self.params
@@ -749,6 +759,9 @@ class HPO:
                 y_hat = linearreg.predict_(X_test, y_test)
                 rmse_values = linearreg.get_rmse(y_hat, y_test, normalize=False)
                 mae_values = linearreg.get_mae(y_hat, y_test, normalize=False)
+                if not(os.path.isdir(f'./{self.baseline_type}')):
+                    os.mkdir(f'./{self.baseline_type}')
+                linearreg.save_prediction_tensor(y_hat, path=f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_best.pt")
             elif self.baseline_type == "lgbm":
                 regressor = GradBooster(
                     X.shape, self.best_fh, self.feature_list, **self.params
@@ -757,6 +770,9 @@ class HPO:
                 y_hat = regressor.predict_(X_test, y_test)
                 rmse_values = regressor.get_rmse(y_hat, y_test, normalize=False)
                 mae_values = regressor.get_mae(y_hat, y_test, normalize=False)
+                if not(os.path.isdir(f'./{self.baseline_type}')):
+                    os.mkdir(f'./{self.baseline_type}')
+                regressor.save_prediction_tensor(y_hat, path=f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_best.pt")
             elif self.baseline_type == "gnn":
                 trainer = Trainer(
                     architecture="trans", hidden_dim=32, lr=1e-3, subset=self.subset
@@ -779,7 +795,7 @@ class HPO:
                 if not(os.path.isdir(f'./{self.baseline_type}')):
                     os.mkdir(f'./{self.baseline_type}')
 
-                torch.save(trainer.model.state_dict(), f"./{self.baseline_type}/model_state_{self.baseline_type}_best}.pt")
+                torch.save(trainer.model.state_dict(), f"./{self.baseline_type}/model_state_{self.baseline_type}_best.pt")
 
                 trainer.save_prediction_tensor(y_hat_normalized, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_best_norm.pt")
 

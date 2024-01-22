@@ -131,12 +131,15 @@ class Visualization:
             for j, feature in enumerate(self.feature_list):
                 row = j // num_cols
                 col = j %num_cols
+                legend = []
                 for i in range(len(baselines)):
-                    axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
-                    axes[row, col].set_title(f"Not Normalized Data Sequence Length - {feature}", fontsize=10)
-                    axes[row, col].legend(baselines, fontsize=8)
-                    axes[row, col].set_xlabel("Sequence Length", fontsize=8)
-                    axes[row, col].set_ylabel("Rmse", fontsize=8)
+                    if "not_normalized_plot_sequence" in self.plots_data[baseline_type] and plot_dict[feature][i]:  # Check if not_normalized_plot_sequence is not empty
+                        legend.append(baselines[i])
+                        axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
+                        axes[row, col].set_title(f"Not Normalized Data Sequence Length - {feature}", fontsize=10)
+                        axes[row, col].legend(legend, fontsize=8)
+                        axes[row, col].set_xlabel("Sequence Length", fontsize=8)
+                        axes[row, col].set_ylabel("Rmse", fontsize=8)
             plt.show()
         else:
             # initialize data structures
@@ -234,25 +237,34 @@ class Visualization:
                     for_feature_dict[feature] = []
 
                 if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
+                    
                     not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_fh"]
-
                     for i, feature in enumerate(self.feature_list):
+                        
                         for key in not_normalized_plot_sequence.keys():
+                            # print(baseline_type)
                             for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
                     
                     for feature in self.feature_list:
+                        # print(baseline_type)
+                        # print(for_feature_dict[feature])
                         plot_dict[feature].append(for_feature_dict[feature])
 
             # plot the transformed data
             for j, feature in enumerate(self.feature_list):
                 row = j // num_cols
-                col = j %num_cols
+                col = j % num_cols
+                legend = []
                 for i in range(len(baselines)):
-                    axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
-                    axes[row, col].set_title(f"Not Normalized Data Forcasting Horizon - {feature}", fontsize=10)
-                    axes[row, col].legend(baselines, fontsize=8)
-                    axes[row, col].set_xlabel("Forcasting Horizon", fontsize=8)
-                    axes[row, col].set_ylabel("Rmse", fontsize=8)
+                    
+                    if "not_normalized_plot_fh" in self.plots_data[baseline_type] and plot_dict[feature][i]:
+                        legend.append(baselines[i])
+                        axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
+                        axes[row, col].set_title(f"Not Normalized Data Forcasting Horizon - {feature}", fontsize=10)
+                        axes[row, col].legend(legend, fontsize=8)
+                        axes[row, col].set_xlabel("Forcasting Horizon", fontsize=8)
+                        axes[row, col].set_ylabel("Rmse", fontsize=8)
+
             plt.show()
         else:
             # initialize data structures

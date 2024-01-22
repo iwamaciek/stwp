@@ -16,6 +16,7 @@ class DataProcessor:
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        path=cfg.DATA_PATH,
     ):
         self.num_spatial_constants, self.num_temporal_constants = 0, 0
         self.temporal_encoding = temporal_encoding or additional_encodings
@@ -26,6 +27,7 @@ class DataProcessor:
             self.temporal_data,
             self.spatial_data,
         ) = self.load_data(
+            path=path,
             spatial_encoding=self.spatial_encoding,
             temporal_encoding=self.temporal_encoding,
         )
@@ -174,8 +176,8 @@ class DataProcessor:
             for t in range(data.shape[0]):
                 for idx, v in enumerate(
                     [
-                        trig_encode(get_day_of_year(dt[t]), 365, "sin"),
-                        trig_encode(get_day_of_year(dt[t]), 365, "cos"),
+                        trig_encode(get_day_of_year(dt[t]), 366, "sin"),
+                        trig_encode(get_day_of_year(dt[t]), 366, "cos"),
                         trig_encode(dt[t].hour, 24, "sin"),
                         trig_encode(dt[t].hour, 24, "cos"),
                     ]
@@ -189,11 +191,11 @@ class DataProcessor:
         return data, feature_list, temporal_data, spatial_data
 
     @staticmethod
-    def train_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=2):
-        return DataProcessor.train_val_test_split(X, y, split_ratio, split_type)
+    def train_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=2, test_shuffle=True):
+        return DataProcessor.train_val_test_split(X, y, split_ratio, split_type, test_shuffle)
 
     @staticmethod
-    def train_val_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=1):
+    def train_val_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=1, test_shuffle=True):
         """
         split_type=0: X_train (2020), X_val (2021), X_test (2022)
         split_type=1: X_train (2020), X_test (2021)
@@ -216,7 +218,8 @@ class DataProcessor:
             )
             X_train, y_train = shuffle(X_train, y_train, random_state=cfg.RANDOM_STATE)
             X_val, y_val = shuffle(X_val, y_val, random_state=cfg.RANDOM_STATE)
-            X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
+            if test_shuffle:
+                X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
 
             return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -233,7 +236,9 @@ class DataProcessor:
             y_train, y_test = y[:train_samples], y[train_samples:]
 
         X_train, y_train = shuffle(X_train, y_train, random_state=cfg.RANDOM_STATE)
-        X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
+
+        if test_shuffle:
+            X_test, y_test = shuffle(X_test, y_test, random_state=cfg.RANDOM_STATE)
 
         return X_train, X_test, y_train, y_test
 
@@ -256,7 +261,7 @@ class DataProcessor:
     @staticmethod
     def get_spatial_info():
         res = 0.25
-        north, west, south, east = BIG_AREA
+        north, west, south, east = SMALL_AREA
         spatial_limits = [west, east, south, north]
         we_span_1d = np.arange(west, east + res, res)
         ns_span_1d = np.arange(north, south - res, -res)

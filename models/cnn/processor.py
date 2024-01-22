@@ -12,11 +12,13 @@ class CNNDataProcessor(NNDataProcessor):
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        test_shuffle=True,
     ) -> None:
         super().__init__(
             spatial_encoding=spatial_encoding,
             temporal_encoding=temporal_encoding,
             additional_encodings=additional_encodings,
+            test_shuffle=test_shuffle,
         )
 
     def preprocess(self, subset=None):
@@ -37,7 +39,7 @@ class CNNDataProcessor(NNDataProcessor):
             -1, self.num_latitudes, self.num_longitudes, cfg.FH, self.num_features
         )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
-            X, y, subset
+            X, y, subset, test_shuffle=self.test_shuffle
         )
 
     def map_latitude_longitude_span(

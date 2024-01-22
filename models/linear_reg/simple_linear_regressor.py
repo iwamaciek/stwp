@@ -18,8 +18,9 @@ class SimpleLinearRegressor(BaselineRegressor):
         feature_list,
         regressor_type="linear",
         alpha=1.0,
+        scaler_type="standard",
     ):
-        super().__init__(X_shape, fh, feature_list)
+        super().__init__(X_shape, fh, feature_list, scaler_type=scaler_type)
 
         if regressor_type == "linear":
             self.model = LinearRegression()
@@ -103,12 +104,10 @@ class SimpleLinearRegressor(BaselineRegressor):
         return y_hat
 
     def extend(self, Y):
-        # TODO function that maps no. of neighbours -> radius
         if self.neighbours <= 5:
             radius = 1
         elif self.neighbours <= 13:
             radius = 2
-        # ...
         else:
             radius = 3
 

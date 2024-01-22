@@ -8,8 +8,8 @@ from models.baseline_regressor import BaselineRegressor
 
 
 class GradBooster(BaselineRegressor):
-    def __init__(self, X_shape, fh, feature_list, booster="lgb", **kwargs):
-        super().__init__(X_shape, fh, feature_list)
+    def __init__(self, X_shape, fh, feature_list, booster="lgb", scaler_type="standard", **kwargs):
+        super().__init__(X_shape, fh, feature_list, scaler_type=scaler_type)
         if booster == "lgb":
             self.model = LGBMRegressor(verbose=-1, n_jobs=-1, **kwargs)
         elif booster == "xgb":
@@ -20,7 +20,6 @@ class GradBooster(BaselineRegressor):
             self.model = AdaBoostRegressor(**kwargs)
         else:
             print(f"{booster} booster not implemented")
-
             raise ValueError
 
         self.models = [copy.deepcopy(self.model) for _ in range(self.num_features)]

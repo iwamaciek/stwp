@@ -13,12 +13,11 @@ from models.gnn.callbacks import (
     CkptCallback,
     EarlyStoppingCallback,
 )
-from models.gnn.cgc_conv import CrystalGNN
-from models.gnn.transformer_conv import TransformerGNN
-from models.gnn.gat_conv import GATConvNN
-from models.gnn.gen_conv import GENConvNN
-from models.gnn.pdn_conv import PDNConvNN
+from models.gnn.gnn_module import GNNModule
 from utils.draw_functions import draw_poland
+from datetime import datetime
+
+from utils.trig_encode import trig_decode
 
 
 class Trainer:
@@ -31,6 +30,7 @@ class Trainer:
         subset=None,
         spatial_mapping=True,
         additional_encodings=True,
+        test_shuffle=True,
     ):
         self.train_loader = None
         self.val_loader = None
@@ -49,7 +49,7 @@ class Trainer:
         self.subset = subset
 
         self.cfg = cfg
-        self.nn_proc = NNDataProcessor(additional_encodings=additional_encodings)
+        self.nn_proc = NNDataProcessor(additional_encodings=additional_encodings, test_shuffle=test_shuffle)
         self.init_data_process()
 
         self.model = None
@@ -65,7 +65,7 @@ class Trainer:
         self.optimizer = None
         self.lr_callback = None
         self.ckpt_callback = None
-        self.early_stop_callback = EarlyStoppingCallback()
+        self.early_stop_callback = None
         self.init_train_details()
 
     def update_config(self, c):
@@ -102,6 +102,7 @@ class Trainer:
 
     def init_architecture(self):
         init_dict = {
+            "arch": self.architecture,
             "input_features": self.features,
             "output_features": self.features,
             "edge_dim": self.edge_attr.size(-1),
@@ -110,32 +111,23 @@ class Trainer:
             "input_s_dim": self.nn_proc.num_spatial_constants,
             "input_size": self.cfg.INPUT_SIZE,
             "fh": self.cfg.FH,
+            "num_graph_cells": self.cfg.GRAPH_CELLS,
         }
-
-        if self.architecture == "cgcn":
-            self.model = CrystalGNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "trans":
-            self.model = TransformerGNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "gat":
-            self.model = GATConvNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "gen":
-            self.model = GENConvNN(**init_dict).to(self.cfg.DEVICE)
-        elif self.architecture == "pdn":
-            self.model = PDNConvNN(**init_dict).to(self.cfg.DEVICE)
-        else:
-            self.model = None
-            print(f"Architecture {self.architecture} not implemented")
-            raise NotImplemented
+        self.model = GNNModule(**init_dict).to(self.cfg.DEVICE)
+        # self.model = torch.compile(self.model)
 
     def init_train_details(self):
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.lr, weight_decay=1e-4
+        )
         self.lr_callback = LRAdjustCallback(self.optimizer, gamma=self.gamma)
         self.ckpt_callback = CkptCallback(self.model)
+        self.early_stop_callback = EarlyStoppingCallback()
 
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path))
 
-    def train(self, num_epochs=50):
+    def train(self, num_epochs=50, verbose=False):
         # gradient_clip = 32
         start = time.time()
 
@@ -168,10 +160,11 @@ class Trainer:
             avg_loss = total_loss / (self.subset * self.cfg.BATCH_SIZE)
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
-
-            print(
-                f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.5f}, lr: {last_lr}"
-            )
+            
+            if verbose:
+                print(
+                    f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.5f}, lr: {last_lr}"
+                )
 
             self.model.eval()
             with torch.no_grad():
@@ -198,7 +191,8 @@ class Trainer:
             )
             val_loss_list.append(avg_val_loss)
 
-            print(f"Val Loss: {avg_val_loss:.5f}\n---------")
+            if verbose:
+                print(f"Val Loss: {avg_val_loss:.5f}\n---------")
 
             self.lr_callback.step(avg_val_loss)
             self.ckpt_callback.step(avg_val_loss)
@@ -207,8 +201,9 @@ class Trainer:
                 break
 
         end = time.time()
-        print(f"{end - start} [s]")
-        self.plot_loss(val_loss_list, train_loss_list)
+        if verbose:
+            print(f"{end - start} [s]")
+            self.plot_loss(val_loss_list, train_loss_list)
 
     @staticmethod
     def plot_loss(val_loss_list, train_loss_list):
@@ -220,28 +215,30 @@ class Trainer:
         plt.legend()
         plt.show()
 
-    def inverse_normalization_predict(self, X, y, edge_index, edge_attr, s, t):
+    def predict(self, X, y, edge_index, edge_attr, s, t, inverse_norm=True):
         y = y.reshape((-1, self.latitude, self.longitude, self.features, self.cfg.FH))
-        y = y.cpu().detach().numpy()
-
-        y_hat = self.model(X, edge_index, edge_attr, t, s)
-        y_hat = y_hat.reshape(
+        y_hat = self.model(X, edge_index, edge_attr, t, s).reshape(
             (-1, self.latitude, self.longitude, self.features, self.cfg.FH)
         )
+
+        y = y.cpu().detach().numpy()
         y_hat = y_hat.cpu().detach().numpy()
 
-        yshape = (self.latitude, self.longitude, self.cfg.FH)
+        if inverse_norm:
+            y_shape = (self.latitude, self.longitude, self.cfg.FH)
+            for i in range(self.features):
+                for j in range(y_hat.shape[0]):
+                    yi = y[j, ..., i, :].copy().reshape(-1, 1)
+                    yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
-        for i in range(self.features):
-            for j in range(y_hat.shape[0]):
-                yi = y[j, ..., i, :].copy().reshape(-1, 1)
-                yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
-
-                y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
-                y_hat[j, ..., i, :] = (
-                    self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
-                )
-
+                    y[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yi).reshape(y_shape)
+                    )
+                    y_hat[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yhat_i).reshape(y_shape)
+                    )
+        if inverse_norm:
+            y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat
 
     def plot_predictions(self, data_type="test", pretty=False):
@@ -264,7 +261,7 @@ class Trainer:
             }
 
         X, y = sample.x, sample.y
-        y, y_hat = self.inverse_normalization_predict(
+        y, y_hat = self.predict(
             X, y, sample.edge_index, sample.edge_attr, sample.pos, sample.time
         )
         latitude, longitude = self.latitude, self.longitude
@@ -319,7 +316,72 @@ class Trainer:
 
         self.calculate_metrics(y_hat, y)
 
-    def evaluate(self, data_type="test"):
+    def plot_error_heatmap(self,  data_type="test", pretty=False):
+        if data_type == "train":
+            sample = next(iter(self.train_loader))
+        elif data_type == "test":
+            sample = next(iter(self.test_loader))
+        elif data_type == "val":
+            sample = next(iter(self.val_loader))
+        else:
+            print("Invalid type: (train, test, val)")
+            raise ValueError
+
+        if pretty:
+            lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
+            spatial = {
+                "lat_span": lat_span,
+                "lon_span": lon_span,
+                "spatial_limits": spatial_limits,
+            }
+
+        X, y = sample.x, sample.y
+        y, y_hat = self.predict(
+            X, y, sample.edge_index, sample.edge_attr, sample.pos, sample.time
+        )
+        latitude, longitude = self.latitude, self.longitude
+
+        if self.spatial_mapping:
+            y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
+            y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
+            latitude, longitude = y_hat.shape[1:3]
+
+        for i in range(self.cfg.BATCH_SIZE):
+            if pretty:
+                fig, axs = plt.subplots(
+                    self.features,
+                    self.cfg.FH,
+                    figsize=(10 * self.cfg.FH, self.features),
+                    subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
+                )
+            else:
+                fig, ax = plt.subplots(
+                    self.features,
+                    self.cfg.FH,
+                    figsize=(10 * self.cfg.FH, self.features),
+                )
+
+            for j, feature_name in enumerate(self.feature_list):
+                for k in range(self.cfg.FH):
+                    ts = k
+                    if pretty:
+                        ax = axs[j]
+
+                    title = rf"$|X - \hat{{X}}|_{{{feature_name},t+{ts + 1}}}$"
+                    value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
+                    cmap = "binary"
+
+                    if pretty:
+                        draw_poland(ax, value, title, cmap, **spatial)
+                    else:
+                        pl = ax[j].imshow(
+                            value.reshape(latitude, longitude), cmap=cmap
+                        )
+                        ax[j, k].set_title(title)
+                        ax[j, k].axis("off")
+                        _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+
+    def evaluate(self, data_type="test", verbose=True, inverse_norm=True, begin=None, end=None):
         if data_type == "train":
             loader = self.train_loader
         elif data_type == "test":
@@ -333,33 +395,127 @@ class Trainer:
         y = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         for batch in loader:
-            y_i, y_hat_i = self.inverse_normalization_predict(
+            # print(i)
+            if begin is not None and end is not None:
+                v_sin = batch.time[0].item()
+                v_cos = batch.time[1].item()
+                # ts = np.arctan2(v_sin, v_cos) / (2 * np.pi) * 365
+                ts = trig_decode(v_sin, v_cos, 366)
+                # print(f"ts: {ts}, begin: {begin}, end: {end}")
+                if begin > ts or end < ts:
+                    # print("continue")
+                    continue
+            y_i, y_hat_i = self.predict(
                 batch.x,
                 batch.y,
                 batch.edge_index,
                 batch.edge_attr,
                 batch.pos,
                 batch.time,
+                inverse_norm=inverse_norm,
             )
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
+
+            # print(f'y_hat: {y_hat.shape}, y_hat_i: {y_hat_i.shape}, y_i: {y_i.shape}, batch.x: {batch.x.shape}, y: {y.shape}')
+
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
-        self.calculate_metrics(y_hat, y)
+        
+        # print(y_hat.shape)
+        # print(y_hat)
+        try:
+            return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
+        
+        except Exception as e:
+            print(e)
+            return None, y_hat
 
-        return self.return_metric(y_hat, y)
+    def autoreg_evaluate(self, data_type="test", fh=2, verbose=True, inverse_norm=True):
+        # Only works for fh=1 for now
+        self.cfg.BATCH_SIZE = 1
+        self.cfg.FH = fh
+        self.update_data_process()
+        self.cfg.FH = 1
 
-    def calculate_metrics(self, y_hat, y):
-        for i, feature_name in enumerate(self.feature_list):
-            y_fi = y[..., i, :].reshape(-1, 1)
-            y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
-            rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
-            mae = mean_absolute_error(y_hat_fi, y_fi)
-            print(f"RMSE for {feature_name}: {rmse}; MAE for {feature_name}: {mae};")
-    
-    def return_metric(self, y_hat, y):
+        if data_type == "train":
+            loader = self.train_loader
+        elif data_type == "test":
+            loader = self.test_loader
+        elif data_type == "val":
+            loader = self.val_loader
+        else:
+            print("Invalid type: (train, test, val)")
+            raise ValueError
+
+        y = torch.empty((0, self.latitude, self.longitude, self.features, fh)).to(
+            self.cfg.DEVICE
+        )
+        y_hat = torch.empty((0, self.latitude, self.longitude, self.features, fh)).to(
+            self.cfg.DEVICE
+        )
+        y_shape = (self.latitude * self.longitude, self.features, 1)
+        for batch in loader:
+            y_hat_autoreg_i = torch.zeros_like(batch.y)
+            y_i = torch.zeros_like(batch.y)
+            for t in range(fh):
+                input_batch = batch.clone()
+                input_batch.y = input_batch.y[..., t : t + 1]
+                if t == 0:
+                    y_it, y_hat_it = self.predict(
+                        input_batch.x,
+                        input_batch.y,
+                        input_batch.edge_index,
+                        input_batch.edge_attr,
+                        input_batch.pos,
+                        input_batch.time,
+                        inverse_norm=inverse_norm,
+                    )
+                else:
+                    input_batch.x = torch.cat(
+                        (input_batch.x[..., :-t], y_hat_autoreg_i[..., :t]), dim=-1
+                    )
+                    y_it, y_hat_it = self.predict(
+                        input_batch.x,
+                        input_batch.y,
+                        input_batch.edge_index,
+                        input_batch.edge_attr,
+                        input_batch.pos,
+                        input_batch.time,
+                        inverse_norm=inverse_norm,
+                    )
+                y_hat_i = torch.from_numpy(y_hat_it).to(self.cfg.DEVICE)
+                y_it = torch.from_numpy(y_it).to(self.cfg.DEVICE)
+                y_hat_autoreg_i[..., t : t + 1] = y_hat_i.reshape(y_shape)
+                y_i[..., t : t + 1] = y_it.reshape(y_shape)
+
+            y = torch.cat(
+                (y, y_i.reshape(1, self.latitude, self.longitude, self.features, fh)),
+                dim=0,
+            )
+            y_hat = torch.cat(
+                (
+                    y_hat,
+                    y_hat_autoreg_i.reshape(
+                        1, self.latitude, self.longitude, self.features, fh
+                    ),
+                ),
+                dim=0,
+            )
+
+        y_hat = y_hat.cpu().detach().numpy()
+        y = y.cpu().detach().numpy()
+
+        if self.spatial_mapping:
+            y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
+            y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
+
+        self.cfg.FH = 1
+        return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
+
+    def calculate_metrics(self, y_hat, y, verbose=False):
         rmse_features = []
         mae_features = []
         for i, feature_name in enumerate(self.feature_list):
@@ -367,9 +523,33 @@ class Trainer:
             y_hat_fi = y_hat[..., i, :].reshape(-1, 1)
             rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
             mae = mean_absolute_error(y_hat_fi, y_fi)
+            if verbose:
+                print(
+                    f"RMSE for {feature_name}: {rmse}; MAE for {feature_name}: {mae};"
+                )
             rmse_features.append(rmse)
             mae_features.append(mae)
         return rmse_features, mae_features
 
-    def get_model(self):
-        return self.model
+    def save_prediction_tensor(self, y_hat, path=None):
+        if isinstance(y_hat, torch.Tensor):
+            y_hat = y_hat.cpu().detach().numpy()
+        elif not isinstance(y_hat, np.ndarray):
+            raise ValueError(
+                "Input y_hat should be either a PyTorch Tensor or a NumPy array."
+            )
+        if path is None:
+            t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            path = f"../data/pred/{self.architecture}_{t}.npy"
+        np.save(path, y_hat)
+
+    def calculate_model_params(self):
+        params = 0
+        for p in self.model.parameters():
+            params += p.reshape(-1).shape[0]
+        print(f"Model parameters: {params}")
+
+    @staticmethod
+    def clip_total_cloud_cover(y_hat, idx=2):
+        y_hat[..., idx, :] = np.clip(y_hat[..., idx, :], 0, 1)
+        return y_hat

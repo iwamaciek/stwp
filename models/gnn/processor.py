@@ -23,8 +23,11 @@ class NNDataProcessor:
         spatial_encoding=False,
         temporal_encoding=False,
         additional_encodings=False,
+        test_shuffle=True,
+        path=cfg.DATA_PATH,
     ):
         self.data_proc = DataProcessor(
+            path=path,
             spatial_encoding=spatial_encoding,
             temporal_encoding=temporal_encoding,
             additional_encodings=additional_encodings,
@@ -48,6 +51,7 @@ class NNDataProcessor:
         self.train_loader = None
         self.val_loader = None
         self.test_loader = None
+        self.test_shuffle = test_shuffle
 
         self.train_size = None
         self.val_size = None
@@ -70,7 +74,7 @@ class NNDataProcessor:
             X_train, X_test, y_train, y_test, scaler_type=self.cfg.SCALER_TYPE
         )
         self.train_loader, self.val_loader, self.test_loader = self.get_loaders(
-            X, y, subset
+            X, y, subset, test_shuffle=self.test_shuffle
         )
 
     def train_val_test_split(self):
@@ -160,6 +164,43 @@ class NNDataProcessor:
 
         return X, y
 
+    def inverse_transform_scalers(self, X, y):
+        X = X.transpose((0, 1, 3, 2))
+        y = y.transpose((0, 1, 3, 2))
+        for i in range(self.num_features):
+            X_i = X[..., i].reshape(-1, 1)
+            y_i = y[..., i].reshape(-1, 1)
+            X[..., i] = (
+                self.scalers[i]
+                .inverse_transform(X_i)
+                .reshape(
+                    (
+                        X.shape[0],
+                        self.num_latitudes * self.num_longitudes,
+                        self.cfg.INPUT_SIZE,
+                    )
+                )
+            )
+            y[..., i] = (
+                self.scalers[i]
+                .inverse_transform(y_i)
+                .reshape(
+                    (y.shape[0], self.num_latitudes * self.num_longitudes, self.cfg.FH)
+                )
+            )
+        X = X.reshape(
+            -1,
+            self.num_latitudes * self.num_longitudes,
+            self.cfg.INPUT_SIZE,
+            self.num_features,
+        )
+        y = y.reshape(
+            -1, self.num_latitudes * self.num_longitudes, self.cfg.FH, self.num_features
+        )
+        X = X.transpose((0, 1, 3, 2))
+        y = y.transpose((0, 1, 3, 2))
+        return X, y
+
     def create_edges(self, r=None):
         if r is None:
             r = self.cfg.R
@@ -196,7 +237,7 @@ class NNDataProcessor:
 
         return edge_index, edge_weights, edge_attr
 
-    def get_loaders(self, X, y, subset=None):
+    def get_loaders(self, X, y, subset=None, test_shuffle=True):
         dataset = []
         for i in range(X.shape[0]):
             Xi = torch.from_numpy(X[i].astype("float32")).to(self.cfg.DEVICE)
@@ -230,7 +271,8 @@ class NNDataProcessor:
         # random state for reproduction
         train_dataset = shuffle(train_dataset, random_state=self.cfg.RANDOM_STATE)
         val_dataset = shuffle(val_dataset, random_state=self.cfg.RANDOM_STATE)
-        test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
+        if test_shuffle:
+            test_dataset = shuffle(test_dataset, random_state=self.cfg.RANDOM_STATE)
 
         if subset is not None:
             train_dataset = train_dataset[: subset * self.cfg.BATCH_SIZE]
@@ -281,7 +323,7 @@ class NNDataProcessor:
         up_lon = lon_diff // 2
         down_lon = new_lon + lon_diff - up_lon - 1
 
-        mapped_tensor = input_tensor[:, left_lat:right_lat, up_lon:down_lon]
+        mapped_tensor = input_tensor[:, left_lat:right_lat, lon_diff:]
         mapped_tensor.reshape(-1, self.num_features, mapped_tensor.shape[4])
 
         return mapped_tensor

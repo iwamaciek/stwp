@@ -2,6 +2,9 @@
 import numpy as np
 import copy
 import cartopy.crs as ccrs
+import os
+import sys
+sys.path.append("..")
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.dummy import DummyRegressor
@@ -13,11 +16,12 @@ from sklearn.preprocessing import (
     RobustScaler,
 )
 from utils.draw_functions import draw_poland
+from datetime import datetime
 
 
 class BaselineRegressor:
     def __init__(
-        self, X_shape: tuple, fh: int, feature_list: list, scaler_type="robust"
+        self, X_shape: tuple, fh: int, feature_list: list, scaler_type="standard"
     ):
         if len(X_shape) > 5:
             (
@@ -55,11 +59,15 @@ class BaselineRegressor:
             print(f"{scaler_type} scaler not implemented")
             raise ValueError
 
-        self.model = DummyRegressor()
+        self.model = DummyRegressor(strategy="constant", constant=0)
         self.models = [copy.deepcopy(self.model) for _ in range(self.num_features)]
         self.scalers = [copy.deepcopy(self.scaler) for _ in range(self.num_features)]
 
     def train(self, X_train, y_train, normalize=False):
+        if len(str(self.__class__).split(".")) < 4:  # BaselineRegressor
+            y_mean = np.mean(y_train, axis=0)
+            self.model.constant = y_mean
+
         X = X_train.reshape(
             -1,
             self.neighbours
@@ -72,7 +80,7 @@ class BaselineRegressor:
                 self.scalers[i].fit(yi)
             self.models[i].fit(X, yi)
 
-    def get_rmse(self, y_hat, y_test, normalize=False):
+    def get_rmse(self, y_hat, y_test, normalize=False, begin=None, end=None):
         rmse_features = []
         for i in range(self.num_features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
@@ -80,6 +88,10 @@ class BaselineRegressor:
             if normalize:
                 y_test_i = self.scalers[i].transform(y_test_i)
                 y_hat_i = self.scalers[i].transform(y_hat_i)
+
+            if begin is not None and end is not None:
+                y_hat_i = y_hat_i[begin:end]
+                y_test_i = y_test_i[begin:end]
             err = np.sqrt(mean_squared_error(y_hat_i, y_test_i))
             rmse_features.append(err)
         return rmse_features
@@ -165,6 +177,10 @@ class BaselineRegressor:
             plt.show()
 
     def predict_(self, X_test, y_test):
+        if len(str(self.__class__).split(".")) < 4:  # BaselineRegressor
+            y_mean = np.tile(self.model.constant, (y_test.shape[0], 1, 1, 1, 1))
+            return y_mean
+
         X = X_test.reshape(
             -1,
             self.neighbours
@@ -183,6 +199,7 @@ class BaselineRegressor:
             y_hat = np.array(y_hat).transpose((1, 2, 3, 4, 0))
         else:
             y_hat = self.predict_autoreg(X_test, y_test)
+        y_hat = self.clip_total_cloud_cover(y_hat)
         return y_hat
 
     def predict_and_evaluate(self, X_test, y_test, plot=True, max_samples=5):
@@ -272,12 +289,10 @@ class BaselineRegressor:
         shape: (latitude, longitude, neighbours, features)
         It might be in data_processor
         """
-        # TODO function that maps no. of neighbours -> radius
         if self.neighbours <= 5:
             radius = 1
         elif self.neighbours <= 13:
             radius = 2
-        # ...
         else:
             radius = 3
 
@@ -295,3 +310,19 @@ class BaselineRegressor:
                     else:
                         Y_out[la, lo, n] = Y[la, lo]
         return Y_out
+
+    def save_prediction_tensor(self, y_hat, path=None):
+        if path is None:
+            t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            name = str(self.__class__).split(".")[-2]
+            path = f"../data/pred/{name}_{t}.npy"
+        
+        if not os.path.exists(path):
+            with open(path, 'w') as f:
+                f.write("")
+        np.save(path, y_hat.transpose(0, 1, 2, 4, 3))
+
+    @staticmethod
+    def clip_total_cloud_cover(y_hat, idx=2):
+        y_hat[..., idx] = np.clip(y_hat[..., idx], 0, 1)
+        return y_hat

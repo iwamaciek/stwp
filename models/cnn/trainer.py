@@ -9,11 +9,13 @@ from models.gnn.callbacks import (
 from models.gnn.trainer import Trainer as GNNTrainer
 import torch
 import time
+import numpy as np
+from datetime import datetime
 
 
 class Trainer(GNNTrainer):
     def __init__(
-        self, base_units=16, lr=0.001, gamma=0.5, subset=None, spatial_mapping=True
+        self, base_units=16, lr=0.001, gamma=0.5, subset=None, spatial_mapping=True, test_shuffle=True
     ) -> None:
         self.train_loader = None
         self.val_loader = None
@@ -32,7 +34,7 @@ class Trainer(GNNTrainer):
         self.subset = subset
 
         self.cfg = cfg
-        self.nn_proc = CNNDataProcessor(additional_encodings=True)
+        self.nn_proc = CNNDataProcessor(additional_encodings=True, test_shuffle=test_shuffle)
         self.init_data_process()
 
         self.model = None
@@ -45,7 +47,7 @@ class Trainer(GNNTrainer):
         self.optimizer = None
         self.lr_callback = None
         self.ckpt_callback = None
-        self.early_stop_callback = EarlyStoppingCallback()
+        self.early_stop_callback = None
         self.init_train_details()
 
     def init_architecture(self):
@@ -167,7 +169,7 @@ class Trainer(GNNTrainer):
         print(f"{end - start} [s]")
         self.plot_loss(val_loss_list, train_loss_list)
 
-    def inverse_normalization_predict(self, X, y, edge_index, edge_attr, pos, time):
+    def predict(self, X, y, edge_index, edge_attr, pos, time, inverse_norm=True):
         X = (
             X.reshape(
                 -1, self.latitude, self.longitude, self.cfg.INPUT_SIZE * self.features
@@ -190,14 +192,28 @@ class Trainer(GNNTrainer):
 
         yshape = (self.latitude, self.longitude, self.cfg.FH)
 
-        for i in range(self.features):
-            for j in range(y_hat.shape[0]):
-                yi = y[j, ..., i, :].copy().reshape(-1, 1)
-                yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
+        if inverse_norm:
+            for i in range(self.features):
+                for j in range(y_hat.shape[0]):
+                    yi = y[j, ..., i, :].copy().reshape(-1, 1)
+                    yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
-                y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
-                y_hat[j, ..., i, :] = (
-                    self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
-                )
-
+                    y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
+                    y_hat[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
+                    )
+        if inverse_norm:
+            y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat
+
+    def save_prediction_tensor(self, y_hat, path=None):
+        if isinstance(y_hat, torch.Tensor):
+            y_hat = y_hat.cpu().detach().numpy()
+        elif not isinstance(y_hat, np.ndarray):
+            raise ValueError(
+                "Input y_hat should be either a PyTorch Tensor or a NumPy array."
+            )
+        if path is None:
+            t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            path = f"../data/pred/unet_{t}.npy"
+        np.save(path, y_hat)

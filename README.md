@@ -26,3 +26,23 @@ Run the container
 ```shell
 docker run -it --rm -p 8080:8888 --name api meteo-api
 ```
+
+### Feature Examination
+The examined features include key meteorological parameters, each contributing to a comprehensive understanding of atmospheric conditions. The table below outlines these features along with their respective symbols, quantities, and units:
+
+| Symbol | Quantity                             | Unit     |
+| ------ | ------------------------------------ | -------- |
+| t2m    | Temperature at 2m above ground       | °C       |
+| sp     | Surface pressure                     | hPa      |
+| tcc    | Total cloud cover                    | (0 - 1)  |
+| u10    | 10m U wind component                 | $m/s$    |
+| v10    | 10m V wind component                 | $m/s$    |
+| tp     | Total precipitation                  | mm       |
+
+
+### Prediction Quality Visualization
+
+In the demonstration below, we showcase the prediction quality of the graph architecture using a randomly selected learning example. The forecasting horizon is set to 1, representing the prediction timestamp t+1, which corresponds to a projection 6 hours into the future:
+![gnn_sample_pred-1](https://github.com/iwamaciek/stwp/assets/82380348/12a3a40e-4baa-4274-807d-fa742fa7d710)
+
+

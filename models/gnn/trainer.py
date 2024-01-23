@@ -234,7 +234,7 @@ class Trainer:
             y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat
 
-    def plot_predictions(self, data_type="test", pretty=False):
+    def plot_predictions(self, data_type="test", pretty=False, save=False):
         if data_type == "train":
             sample = next(iter(self.train_loader))
         elif data_type == "test":
@@ -285,15 +285,15 @@ class Trainer:
                     if pretty:
                         ax = axs[j, k]
                     if k % 3 == 0:
-                        title = rf"$X_{{{feature_name},t+{ts + 1}}}$"
+                        title = rf"$Y^{{t+{ts+1}}}_{{{feature_name}}}$"
                         value = y[i, ..., j, ts]
                         cmap = plt.cm.coolwarm
                     elif k % 3 == 1:
-                        title = rf"$\hat{{X}}_{{{feature_name},t+{ts + 1}}}$"
+                        title = rf"$\hat{{Y}}^{{t+{ts+1}}}_{{{feature_name}}}$"
                         value = y_hat[i, ..., j, ts]
                         cmap = plt.cm.coolwarm
                     else:
-                        title = rf"$|X - \hat{{X}}|_{{{feature_name},t+{ts + 1}}}$"
+                        title = rf"$|Y - \hat{{Y}}|^{{t+{ts+1}}}_{{{feature_name}}}$"
                         value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
                         cmap = "binary"
 
@@ -306,7 +306,9 @@ class Trainer:
                         ax[j, k].set_title(title)
                         ax[j, k].axis("off")
                         _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
-
+        plt.tight_layout()
+        if save:
+            plt.savefig(f"../data/analysis/{self.architecture}_{data_type}.pdf")
         self.calculate_metrics(y_hat, y)
 
     def evaluate(self, data_type="test", verbose=True, inverse_norm=True):

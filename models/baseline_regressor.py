@@ -104,7 +104,7 @@ class BaselineRegressor:
     def evaluate(self, y_hat, y_test):
         return self.get_rmse(y_hat, y_test), self.get_mae(y_hat, y_test)
 
-    def plot_predictions(self, y_hat, y_test, max_samples, pretty=False):
+    def plot_predictions(self, y_hat, y_test, max_samples, pretty=False, save=False):
         if pretty:
             lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
             spatial = {
@@ -148,15 +148,15 @@ class BaselineRegressor:
                     if pretty:
                         ax = axs[j, k]
                     if k % 3 == 0:
-                        title = rf"$X_{{{cur_feature},t+{ts+1}}}$"
+                        title = rf"$Y^{{t+{ts+1}}}_{{{cur_feature}}}$"
                         value = y_test[i, ..., ts, j]
                         cmap = plt.cm.coolwarm
                     elif k % 3 == 1:
-                        title = rf"$\hat{{X}}_{{{cur_feature},t+{ts+1}}}$"
+                        title = rf"$\hat{{Y}}^{{t+{ts+1}}}_{{{cur_feature}}}$"
                         value = y_hat[i, ..., ts, j]
                         cmap = plt.cm.coolwarm
                     else:
-                        title = rf"$|X - \hat{{X}}|_{{{cur_feature},t+{ts+1}}}$"
+                        title = rf"$|Y - \hat{{Y}}|^{{t+{ts+1}}}_{{{cur_feature}}}$"
                         value = np.abs(y_test[i, ..., ts, j] - y_hat[i, ..., ts, j])
                         cmap = "binary"
 
@@ -167,6 +167,10 @@ class BaselineRegressor:
                         ax[j, k].set_title(title)
                         ax[j, k].axis("off")
                         _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+            plt.tight_layout()
+            if save:
+                name = str(self.__class__).split(".")[-2]
+                plt.savefig(f"../data/analysis/{name}_{i}.png")
             plt.show()
 
     def predict_(self, X_test, y_test):

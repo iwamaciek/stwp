@@ -22,3 +22,4 @@ data
 *.svg
 *.pdf
 Untitled.ipynb
+*.npy

@@ -395,7 +395,6 @@ class Trainer:
         y = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         y_hat = np.empty((0, self.latitude, self.longitude, self.features, self.cfg.FH))
         for batch in loader:
-            # print(i)
             if begin is not None and end is not None:
                 v_sin = batch.time[0].item()
                 v_cos = batch.time[1].item()
@@ -417,15 +416,11 @@ class Trainer:
             y = np.concatenate((y, y_i), axis=0)
             y_hat = np.concatenate((y_hat, y_hat_i), axis=0)
 
-
             # print(f'y_hat: {y_hat.shape}, y_hat_i: {y_hat_i.shape}, y_i: {y_i.shape}, batch.x: {batch.x.shape}, y: {y.shape}')
 
         if self.spatial_mapping:
             y_hat = self.nn_proc.map_latitude_longitude_span(y_hat, flat=False)
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
-        
-        # print(y_hat.shape)
-        # print(y_hat)
         try:
             return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
         

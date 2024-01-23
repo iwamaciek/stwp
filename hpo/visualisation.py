@@ -20,11 +20,11 @@ class Visualization:
 
 
         self.colors = {
-            "simple-linear": "red",
-            "linear": "yellow",
-            "lgbm": "green",
-            "gnn": "blue",
-            "cnn": "black",
+            "simple-linear":'#377eb8',
+            "linear": '#ff7f00',
+            "lgbm": '#4daf4a',
+            "gnn": 'black',
+            "cnn": '#a65628',
         }
 
         self.error_maps = []
@@ -71,7 +71,7 @@ class Visualization:
 
         return table
     
-    def plot_not_normalized_data_sequence(self, for_features=False, one_plot=False):
+    def plot_not_normalized_data_sequence(self, for_features=False, one_plot=False, save=None):
         if for_features == False:
             # Iterate over each baseline_type and plot the data
             for i, baseline_type in enumerate(self.plots_data.keys()):
@@ -102,8 +102,13 @@ class Visualization:
                 # Adjust layout for better spacing
                 plt.tight_layout()
 
+                if save is not None:
+                    plt.savefig(f'{baseline_type}_{save}.pdf')
+
                     # Show the plot for each baseline_type
                 plt.show()
+
+                
         elif one_plot == True and for_features == True:
             num_plots = len(self.plots_data)
             num_cols = 2  # Number of columns in the grid
@@ -148,7 +153,12 @@ class Visualization:
                         axes[row, col].legend(legend, fontsize=8)
                         axes[row, col].set_xlabel("Sequence Length", fontsize=8)
                         axes[row, col].set_ylabel("Rmse", fontsize=8)
+            
+            if save is not None:
+                    plt.savefig(f'{save}.pdf')
             plt.show()
+
+            
         else:
             # initialize data structures
             baselines = []
@@ -189,10 +199,15 @@ class Visualization:
                 ax.legend(baselines)
                 ax.set_xlabel("Sequence Length")
                 ax.set_ylabel("Rmse")
+
+                if save is not None:
+                    plt.savefig(f'{feature}_{save}.pdf')
                 plt.show()
 
+                
 
-    def plot_not_normalized_data_fh(self, for_features=False, one_plot=False):
+
+    def plot_not_normalized_data_fh(self, for_features=False, one_plot=False, save=None):
         if for_features == False:
             # Iterate over each baseline_type and plot the data
             for i, baseline_type in enumerate(self.plots_data.keys()):
@@ -222,7 +237,11 @@ class Visualization:
                 ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
                     # Show the plot for each baseline_type
+                if save is not None:
+                    plt.savefig(f'{baseline_type}_{save}.pdf')
                 plt.show()
+
+                
         elif one_plot == True and for_features == True:
             num_plots = len(self.plots_data)
             num_cols = 2  # Number of columns in the grid
@@ -273,7 +292,12 @@ class Visualization:
                         axes[row, col].set_xlabel("Forcasting Horizon", fontsize=8)
                         axes[row, col].set_ylabel("Rmse", fontsize=8)
 
+            if save is not None:
+                    plt.savefig(f'{save}.pdf')
+
             plt.show()
+
+            
         else:
             # initialize data structures
             baselines = []
@@ -314,9 +338,14 @@ class Visualization:
                 ax.legend(baselines)
                 ax.set_xlabel("Forcasting Horizon")
                 ax.set_ylabel("Rmse")
+
+                if save is not None:
+                    plt.savefig(f'{feature}_{save}.pdf')
                 plt.show()
 
-    def plot_data_sequence(self, one_plot=False):
+                
+
+    def plot_data_sequence(self, one_plot=False, save=None):
         if one_plot:
             # Create a single plot with multiple lines and legend
             fig, ax = plt.subplots(figsize=(10, 8))
@@ -336,8 +365,13 @@ class Visualization:
             ax.set_title("Data Sequence")
             ax.legend()
 
+            if save is not None:
+                plt.savefig(f'{save}.pdf')
+
             # Show the plot
             plt.show()
+
+            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -368,10 +402,15 @@ class Visualization:
             # Adjust the layout and spacing of the subplots
             plt.tight_layout()
 
+            if save is not None:
+                plt.savefig(f'{save}.pdf')
+
             # Show the plot
             plt.show()
 
-    def plot_data_sequence_time(self, one_plot=False):
+            
+
+    def plot_data_sequence_time(self, one_plot=False, save=None):
         if one_plot:
             # Create a single plot with multiple lines and legend
             fig, ax = plt.subplots(figsize=(10, 8))
@@ -396,8 +435,13 @@ class Visualization:
             ax.set_xlabel("Sequence Length")
             ax.set_ylabel("Time [s]")
 
+            if save is not None:
+                plt.savefig(f'baselines_{save}.pdf')
+
             # Show the plot
             plt.show()
+
+            
 
             # Create a single plot with multiple lines and legend
             fig, ax = plt.subplots(figsize=(10, 8))
@@ -422,8 +466,14 @@ class Visualization:
             ax.set_xlabel("Sequence Length")
             ax.set_ylabel("Time [s]")
 
+
+            if save is not None:
+                plt.savefig(f'nets_{save}.pdf')
+
             # Show the plot
             plt.show()
+
+            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -456,10 +506,15 @@ class Visualization:
             # Adjust the layout and spacing of the subplots
             plt.tight_layout()
 
+            if save is not None:
+                plt.savefig(f'{save}.pdf')
+
             # Show the plot
             plt.show()
 
-    def plot_data_fh(self, one_plot=False):
+            
+
+    def plot_data_fh(self, one_plot=False, save=None):
         if one_plot:
             # Create a single plot with multiple lines and legend
             fig, ax = plt.subplots(figsize=(10, 8))
@@ -479,8 +534,13 @@ class Visualization:
             ax.set_xlabel("Forcasting Horizon")
             ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
 
+            if save is not None:
+                plt.savefig(f'{save}.pdf')
+
             # Show the plot
             plt.show()
+
+            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -511,10 +571,15 @@ class Visualization:
             # Adjust the layout and spacing of the subplots
             plt.tight_layout()
 
+            if save is not None:
+                plt.savefig(f'{save}.pdf')
+
             # Show the plot
             plt.show()
 
-    def plot_months(self, one_plot=False):
+            
+
+    def plot_months(self, one_plot=False, save=None):
         months = [
             "Jan",
             "Feb",
@@ -559,9 +624,15 @@ class Visualization:
             plt.xticks(
                 ind + width * (i - 1) / 2, months
             )  # Adjust the position of x-ticks
+
+
+            if save is not None:
+                plt.savefig(f'{save}.pdf')
             plt.show()
 
-    def plot_data_fh_time(self, one_plot=False):
+            
+
+    def plot_data_fh_time(self, one_plot=False, save=None):
         if one_plot:
             # Create a single plot with multiple lines and legend
             fig, ax = plt.subplots(figsize=(10, 8))
@@ -581,9 +652,12 @@ class Visualization:
             ax.legend()
             ax.set_xlabel("Forcasting Horizon")
             ax.set_ylabel("Time [s]")
-
+            if save is not None:
+                plt.savefig(f'baselines_{save}.pdf')
             # Show the plot
             plt.show()
+
+            
 
             fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -603,8 +677,13 @@ class Visualization:
             ax.set_xlabel("Forcasting Horizon")
             ax.set_ylabel("Time [s]")
 
+            if save is not None:
+                plt.savefig(f'nets_{save}.pdf')
+
             # Show the plot
             plt.show()
+
+            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -633,11 +712,14 @@ class Visualization:
                 axes[row, col].set_ylabel("Time [s]")
             # Adjust the layout and spacing of the subplots
             plt.tight_layout()
-
+            if save is not None:
+                plt.savefig(f'{save}.pdf')
             # Show the plot
             plt.show()
 
-    def plot_gnn_alpha(self):
+            
+
+    def plot_gnn_alpha(self, save=None):
         # Create a single plot with multiple lines and legend
         fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -656,10 +738,15 @@ class Visualization:
         ax.set_title("Alpha for Gnn and Tigge mix")
         ax.legend()
 
+        if save is not None:
+            plt.savefig(f'{save}.pdf')
+
         # Show the plot
         plt.show()
 
-    def plot_gnn_layers(self):
+        
+
+    def plot_gnn_layers(self, save=None):
         # Create a single plot with multiple lines and legend
         fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -678,8 +765,13 @@ class Visualization:
         ax.set_title("Gnn Graph Cells")
         ax.legend()
 
+        if save is not None:
+            plt.savefig(f'{save}.pdf')
+
         # Show the plot
         plt.show()
+
+        
 
     def plot_error_maps(self):
         for baseline_type in self.plots_data.keys():

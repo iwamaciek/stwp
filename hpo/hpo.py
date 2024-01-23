@@ -1048,12 +1048,21 @@ class HPO:
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
                 for month in range(1, 13):
+                    if month == 1:
+                        begin = months_days[month][0] - 1
+                        end = months_days[month + 1][0] * 4
+                    elif month == 12:
+                        begin = months_days[month][0] * 4 + 1
+                        end = months_days[month][1] * 4 + 1
+                    else:
+                        begin = months_days[month][0] * 4 + 1
+                        end = months_days[month + 1][0] * 4 + 1
                     rmse_values = linearreg.get_rmse(
                         y_hat,
                         y_test,
                         normalize=True,
-                        begin=months_days[month][0],
-                        end=months_days[month][1],
+                        begin=begin,
+                        end=end,
                     )
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse
@@ -1069,12 +1078,21 @@ class HPO:
                 linearreg.train(X_train, y_train, normalize=True)
                 y_hat = linearreg.predict_(X_test, y_test)
                 for month in range(1, 13):
+                    if month == 1:
+                        begin = months_days[month][0] - 1
+                        end = months_days[month + 1][0] * 4
+                    elif month == 12:
+                        begin = months_days[month][0] * 4 + 1
+                        end = months_days[month][1] * 4 + 1
+                    else:
+                        begin = months_days[month][0] * 4 + 1
+                        end = months_days[month + 1][0] * 4 + 1
                     rmse_values = linearreg.get_rmse(
                         y_hat,
                         y_test,
                         normalize=True,
-                        begin=months_days[month][0],
-                        end=months_days[month][1],
+                        begin=begin,
+                        end=end,
                     )
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse
@@ -1084,12 +1102,21 @@ class HPO:
                 regressor.train(X_train, y_train, normalize=True)
                 y_hat = regressor.predict_(X_test, y_test)
                 for month in range(1, 13):
+                    if month == 1:
+                        begin = months_days[month][0] - 1
+                        end = months_days[month + 1][0] * 4
+                    elif month == 12:
+                        begin = months_days[month][0] * 4 + 1
+                        end = months_days[month][1] * 4 + 1
+                    else:
+                        begin = months_days[month][0] * 4 + 1
+                        end = months_days[month + 1][0] * 4 + 1
                     rmse_values = regressor.get_rmse(
                         y_hat,
                         y_test,
                         normalize=True,
-                        begin=months_days[month][0],
-                        end=months_days[month][1],
+                        begin=begin,
+                        end=end,
                     )
                     mean_rmse = np.mean(rmse_values)
                     self.month_error[months_names[month]] = mean_rmse

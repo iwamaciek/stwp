@@ -837,7 +837,7 @@ class HPO:
                 raise InvalidBaselineException
 
             self.metrics = rmse_values
-            self.metrics_mae = mae_values
+            # self.metrics_mae = mae_values
 
             print("Metrics collected.", rmse_values)
 
@@ -1219,37 +1219,58 @@ class HPO:
 
 
 
-    def gnn_layer(self):
+    def gnn_layer(self, models=None):
         trainer = Trainer(architecture='trans', hidden_dim=32, lr=1e-3, subset=self.subset)
         best_layer = 2
         max_rmse = np.inf
-        for cell in range(2, 10):
-            cfg.FH = self.fh
-            cfg.INPUT_SIZE = self.best_s
-            cfg.GRAPH_CELLS = cell
-            trainer.update_config(cfg)
-            trainer.train(num_epochs=self.num_epochs)
-            rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
-            rmse_values = rmse_values[0]
-            rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
-            rmse_not_normalized = rmse_not_normalized[0]
-            mean_rmse = np.mean(rmse_values)
-            self.gnn_cell_plot_x.append(cell)
-            self.gnn_cell_plot_y.append(mean_rmse)
+        if models is None:
+            for cell in range(2, 10):
+                cfg.FH = self.fh
+                cfg.INPUT_SIZE = self.best_s
+                cfg.GRAPH_CELLS = cell
+                trainer.update_config(cfg)
+                trainer.train(num_epochs=self.num_epochs)
+                rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
+                rmse_values = rmse_values[0]
+                rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
+                rmse_not_normalized = rmse_not_normalized[0]
+                mean_rmse = np.mean(rmse_values)
+                self.gnn_cell_plot_x.append(cell)
+                self.gnn_cell_plot_y.append(mean_rmse)
 
-            if mean_rmse < max_rmse:
-                max_rmse = mean_rmse
-                best_layer = cell
+                if mean_rmse < max_rmse:
+                    max_rmse = mean_rmse
+                    best_layer = cell
 
-            if not(os.path.isdir(f'./{self.baseline_type}')):
-                os.mkdir(f'./{self.baseline_type}')
+                if not(os.path.isdir(f'./{self.baseline_type}')):
+                    os.mkdir(f'./{self.baseline_type}')
 
-            torch.save(trainer.model.state_dict(), f"./{self.baseline_type}/model_state_{self.baseline_type}_cell_{cell}.pt")
+                torch.save(trainer.model.state_dict(), f"./{self.baseline_type}/model_state_{self.baseline_type}_cell_{cell}.pt")
 
-            trainer.save_prediction_tensor(y_hat_normalized, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_cell_{cell}_norm.pt")
+                trainer.save_prediction_tensor(y_hat_normalized, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_cell_{cell}_norm.pt")
 
-            trainer.save_prediction_tensor(y_hat_real, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_cell_{cell}_real.pt")
+                trainer.save_prediction_tensor(y_hat_real, f"./{self.baseline_type}/prediction_tensor_{self.baseline_type}_cell_{cell}_real.pt")
         
+        else:
+            for i, model in enumerate(models, start=2):
+                # cfg.FH = self.fh
+                # cfg.INPUT_SIZE = self.best_s
+                cfg.GRAPH_CELLS = i
+                trainer.update_config(cfg)
+                # trainer.train(num_epochs=self.num_epochs)
+                trainer.load_model(model)
+                rmse_values, y_hat_normalized = trainer.evaluate("test", verbose=self.gnn_verbose, inverse_norm=False)
+                rmse_values = rmse_values[0]
+                rmse_not_normalized, y_hat_real = trainer.evaluate("test", verbose=self.gnn_verbose)
+                rmse_not_normalized = rmse_not_normalized[0]
+                mean_rmse = np.mean(rmse_values)
+                self.gnn_cell_plot_x.append(i)
+                self.gnn_cell_plot_y.append(mean_rmse)
+
+                if mean_rmse < max_rmse:
+                    max_rmse = mean_rmse
+                    best_layer = i
+
         self.best_layer = best_layer
 
 

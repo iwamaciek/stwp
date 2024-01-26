@@ -65,12 +65,10 @@ class CNNDataProcessor(NNDataProcessor):
         right_lat = new_lat + lat_diff - left_lat - 1
 
         lon_diff = old_lon - new_lon
-        up_lon = lon_diff // 2
-        down_lon = new_lon + lon_diff - up_lon - 1
 
         if len(input_tensor.shape) == 4:
-            mapped_tensor = input_tensor[:, :, left_lat:right_lat, up_lon:down_lon]
+            mapped_tensor = input_tensor[:, :, left_lat:right_lat, lon_diff:]
         else:
-            mapped_tensor = input_tensor[:, left_lat:right_lat, up_lon:down_lon, ...]
+            mapped_tensor = input_tensor[:, left_lat:right_lat, lon_diff:, ...]
 
         return mapped_tensor

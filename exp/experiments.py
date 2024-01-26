@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import warnings
 import cartopy.crs as ccrs
 import sys
+from matplotlib.colors import TwoSlopeNorm
 from models.data_processor import DataProcessor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from models.gnn.processor import NNDataProcessor
@@ -29,18 +30,17 @@ class Analyzer:
         self.nn_proc = None
         self.min_length = None
         self.feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
-        self.map_dict = {}
+        self.map_dict = {
+            "grad_booster": "GB",
+            "simple_linear_regressor": "SLR",
+            "linear_regressor": "LR",
+            "unet": "UNET",
+            "trans": "GNN",
+            "baseline_regressor": "NAIVE",
+            "tigge": "TIGGE",
+        }
 
     def init(self):
-        self.map_dict = {
-            "grad_booster": r"$\Phi^{gb}$",
-            "simple_linear_regressor": r"$\Phi^{slr}$",
-            "linear_regressor": r"$\Phi^{lr}$",
-            "unet": r"$\Phi^{unet}$",
-            "trans": r"$\Phi^{gnn}$",
-            "baseline_regressor": r"$\Phi^{naive}$",
-            "tigge": r"$\Phi^{tigge}$",
-        }
         self.get_pred_tensors()
         self.get_era5()
         self.calculate_errors()
@@ -76,6 +76,7 @@ class Analyzer:
     def get_era5(self):
         processor = DataProcessor(path="../data/input/data2021-small.grib")
         self.era5 = processor.data
+        self.min_length = min(self.era5.shape[0], self.min_length)
 
     def generate_full_metrics(self, verbose=False, latex=True):
         rmse_results, mae_results = [], []
@@ -125,15 +126,12 @@ class Analyzer:
             if model != "tigge":
                 self.er_dict[model] = np.zeros_like(self.era5[-self.min_length :])
                 for i in range(len(self.feature_list)):
+                    # reshape -> (num_samples* num_latitudes* num_longitudes, )
                     self.er_dict[model][..., i] = (
                         self.era5[-self.min_length :, ..., i]
                         - pred_tensor[-self.min_length :, ..., i]
                     )
-            # else:
-            #     self.er_dict[model] = np.zeros_like(self.era5[1::2])
-            #     for i in range(len(self.feature_list)):
-            #         self.er_dict[model][..., i] = self.era5[1::2][..., i] - pred_tensor[..., i]
-            # ???
+                    # reshape; print avg
 
     def plot_err_corr_matrix(self, save=False):
         fig, axs = plt.subplots(2, 3, figsize=(15, 10))
@@ -239,8 +237,9 @@ class Analyzer:
                     y_trans, y_tigge, alpha=a, consolidate=True
                 )
             plt.plot(alphas, losses, "-o")
+            plt.title("Combined models")
             plt.xlabel(r"$\alpha$")
-            plt.ylabel(r"$\overline{\|\mathcal{L}_{RMSE}\|}$")
+            plt.ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
             if save:
                 plt.savefig("../data/analysis/alpha_loss.pdf")
             plt.show()
@@ -306,16 +305,27 @@ class Analyzer:
             figsize=(15, 15),
             subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
         )
-        # x = 0.7, y = 0.95, weight = "bold"
+
         for j, model in enumerate(self.avg_er_dict.keys()):
             ax_title = fig.add_subplot(num_features, num_models, j + 1)
             ax_title.set_title(self.map_dict[model], fontsize=12, y=1.05)
             ax_title.axis("off")
             for i, feature in enumerate(self.feature_list):
                 error_map = self.avg_er_dict[model][..., i]
+                norm = TwoSlopeNorm(
+                    vmin=-max(
+                        map(abs, [min(map(min, error_map)), max(map(max, error_map))])
+                    ),
+                    vcenter=0,
+                    vmax=max(
+                        map(abs, [min(map(min, error_map)), max(map(max, error_map))])
+                    ),
+                )
                 title = rf"$(Y - \hat{{Y}})_{{{feature}}}$"
                 axes[i, j].axis("off")
-                draw_poland(axes[i, j], error_map, title, "binary", **spatial)
+                draw_poland(
+                    axes[i, j], error_map, title, plt.cm.coolwarm, norm=norm, **spatial
+                )
         plt.tight_layout(rect=[0, 0, 1, 0.98])
         if save:
             plt.savefig("../data/analysis/error_maps.pdf")
@@ -337,7 +347,7 @@ class Analyzer:
             mae = mean_absolute_error(y_hat_fi, y_fi)
             if verbose:
                 print(
-                    f"RMSE for {self.feature_list[i]}: {rmse}; MAE for {self.feature_list[i]}: {mae};"
+                    f"RMSE for {self.feature_list[i]}: {round(rmse,3)}; MAE for {self.feature_list[i]}: {round(mae,3)};"
                 )
             rmse_features.append(rmse)
             mae_features.append(mae)

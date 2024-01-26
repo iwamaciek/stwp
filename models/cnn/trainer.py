@@ -100,7 +100,6 @@ class Trainer(GNNTrainer):
                 if self.spatial_mapping:
                     labels = self.nn_proc.map_latitude_longitude_span(labels)
                     outputs = self.nn_proc.map_latitude_longitude_span(outputs)
-
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)

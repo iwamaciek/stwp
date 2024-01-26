@@ -162,7 +162,7 @@ def get_values_by_lat_lng(lat, lng):
     features = {
         "sp": np.array([[[json_data[lat][lng]["sp"][timestamp] for timestamp in json_data[lat][lng]["sp"]] for lng in json_data[lat]] for lat in json_data]),
         "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1 else 0 if json_data[lat][lng]["tcc"][timestamp] < 0 else 1 for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
-        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] * 1000 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
+        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
         "u10": np.array([[[json_data[lat][lng]["u10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["u10"]] for lng in json_data[lat]] for lat in json_data]),
         "v10": np.array([[[json_data[lat][lng]["v10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["v10"]] for lng in json_data[lat]] for lat in json_data]),
         "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
@@ -194,7 +194,7 @@ def create_maps():
     # Define the latitude and longitude ranges
     features = {
         "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1 else 0 if json_data[lat][lng]["tcc"][timestamp] < 0 else 1 for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
-        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] * 1000 if 0.05 <= json_data[lat][lng]["tp"][timestamp] * 1000 <= 100 else 0 if json_data[lat][lng]["tp"][timestamp] * 1000 < 0.05 else 100 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
+        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] if 0.05 <= json_data[lat][lng]["tp"][timestamp] <= 100 else 0 if json_data[lat][lng]["tp"][timestamp] < 0.05 else 100 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
         "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
     }
 

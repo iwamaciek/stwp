@@ -196,10 +196,11 @@ class Trainer(GNNTrainer):
                 yi = y[j, ..., i, :].copy().reshape(-1, 1)
                 yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
-                y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
-                y_hat[j, ..., i, :] = (
-                    self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
-                )
+                if inverse_norm:
+                    y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
+                    y_hat[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
+                    )
         if inverse_norm:
             y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat

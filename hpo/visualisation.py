@@ -29,11 +29,11 @@ class Visualization:
 
 
         self.baseline_dict = {
-            'lgbm': r'$\Phi^{gb}$',
-            'simple-linear': r'$\Phi^{slr}$',
-            'linear': r'$\Phi^{lr}$',
-            'gnn': r'$\Phi^{gnn}$',
-            'cnn': r'$\Phi^{unet}$',
+            'lgbm': r'$GB$',
+            'simple-linear': r'$SLR$',
+            'linear': r'$LR$',
+            'gnn': r'$GNN$',
+            'cnn': r'$U-NET$',
         }
 
         self.error_maps = []
@@ -106,7 +106,7 @@ class Visualization:
                 ax.set_title(f"Input Sequence - {self.baseline_dict[baseline_type]}")
                 ax.legend(self.feature_list)
                 ax.set_xlabel("Sequence Length")
-                ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+                ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
                 # Adjust layout for better spacing
                 plt.tight_layout()
@@ -243,7 +243,7 @@ class Visualization:
                 )
                 ax.legend(self.feature_list)
                 ax.set_xlabel("Number of Predicted Steps")
-                ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+                ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
                     # Show the plot for each baseline_type
                 if save is not None:
@@ -368,7 +368,7 @@ class Visualization:
                 # Plot the data on the single plot
                 ax.plot(sequence_plot_x, sequence_plot_y, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
                 ax.set_xlabel("Sequence Length")
-                ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+                ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
             # Set the title and legend
             ax.set_title("Input Sequence Length")
@@ -406,7 +406,7 @@ class Visualization:
                     self.baseline_dict[baseline_type]
                 )  # Set the title as the baseline_type
                 axes[row, col].set_xlabel("Sequence Length")
-                axes[row, col].set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+                axes[row, col].set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}}$")
 
             # Adjust the layout and spacing of the subplots
             plt.tight_layout()
@@ -541,7 +541,7 @@ class Visualization:
             ax.set_title("Predicted Steps")
             ax.legend()
             ax.set_xlabel("Number of Predicted Steps")
-            ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+            ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
             if save is not None:
                 plt.savefig(f'{save}.pdf', bbox_inches='tight')
@@ -575,7 +575,7 @@ class Visualization:
                     self.baseline_dict[baseline_type]
                 )  # Set the title as the baseline_type
                 axes[row, col].set_xlabel("Forcasting Horizon")
-                axes[row, col].set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+                axes[row, col].set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
             # Adjust the layout and spacing of the subplots
             plt.tight_layout()
@@ -627,7 +627,7 @@ class Visualization:
             ax.set_title("Monthly errors")
             ax.legend()
             ax.set_xlabel("Months")
-            ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+            ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
             # Show the plot
             plt.xticks(
@@ -678,10 +678,10 @@ class Visualization:
                     fh_plot_time = self.plots_data[baseline_type]["fh_plot_time"]
 
                     # Plot the data on the single plot
-                    ax.plot(fh_plot_x, fh_plot_time, "-o", label=baseline_type, color=self.colors[baseline_type])
+                    ax.plot(fh_plot_x, fh_plot_time, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
 
             # Set the title and legend
-            ax.set_title("Data FH Time (Nets)")
+            ax.set_title("Predicted Steps Time (Nets)")
             ax.legend()
             ax.set_xlabel("Forcasting Horizon")
             ax.set_ylabel("Time [s]")
@@ -741,7 +741,7 @@ class Visualization:
                 # Plot the data on the single plot
                 ax.plot(alpha_plot_x, alpha_plot_y, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
                 ax.set_xlabel("Alpha")
-                ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+                ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
         # Set the title and legend
         ax.set_title("Alpha for Gnn and Tigge mix")
@@ -767,11 +767,11 @@ class Visualization:
 
                 # Plot the data on the single plot
                 ax.plot(cell_plot_x, cell_plot_y, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
-                ax.set_xlabel("Number of Graph Cells")
-                ax.set_ylabel(r"$\overline{\| \mathcal{L}_{RMSE} \|}$")
+                ax.set_xlabel("Number of Graph Layers")
+                ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
         # Set the title and legend
-        ax.set_title("Gnn Graph Cells")
+        ax.set_title("GNN Graph Layers")
         ax.legend()
 
         if save is not None:

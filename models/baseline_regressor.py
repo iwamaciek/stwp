@@ -4,6 +4,7 @@ import copy
 import cartopy.crs as ccrs
 import os
 import sys
+
 sys.path.append("..")
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -82,16 +83,15 @@ class BaselineRegressor:
 
     def get_rmse(self, y_hat, y_test, normalize=False, begin=None, end=None):
         rmse_features = []
+        if begin is not None and end is not None:
+            y_hat = y_hat[begin:end]
+            y_test = y_test[begin:end]
         for i in range(self.num_features):
             y_hat_i = y_hat[..., i].reshape(-1, 1)
             y_test_i = y_test[..., i].reshape(-1, 1)
             if normalize:
                 y_test_i = self.scalers[i].transform(y_test_i)
                 y_hat_i = self.scalers[i].transform(y_hat_i)
-
-            if begin is not None and end is not None:
-                y_hat_i = y_hat_i[begin:end]
-                y_test_i = y_test_i[begin:end]
             err = np.sqrt(mean_squared_error(y_hat_i, y_test_i))
             rmse_features.append(err)
         return rmse_features
@@ -111,7 +111,7 @@ class BaselineRegressor:
     def evaluate(self, y_hat, y_test):
         return self.get_rmse(y_hat, y_test), self.get_mae(y_hat, y_test)
 
-    def plot_predictions(self, y_hat, y_test, max_samples, pretty=False):
+    def plot_predictions(self, y_hat, y_test, max_samples, pretty=False, save=False):
         if pretty:
             lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
             spatial = {
@@ -155,15 +155,15 @@ class BaselineRegressor:
                     if pretty:
                         ax = axs[j, k]
                     if k % 3 == 0:
-                        title = rf"$X_{{{cur_feature},t+{ts+1}}}$"
+                        title = rf"$Y^{{t+{ts+1}}}_{{{cur_feature}}}$"
                         value = y_test[i, ..., ts, j]
                         cmap = plt.cm.coolwarm
                     elif k % 3 == 1:
-                        title = rf"$\hat{{X}}_{{{cur_feature},t+{ts+1}}}$"
+                        title = rf"$\hat{{Y}}^{{t+{ts+1}}}_{{{cur_feature}}}$"
                         value = y_hat[i, ..., ts, j]
                         cmap = plt.cm.coolwarm
                     else:
-                        title = rf"$|X - \hat{{X}}|_{{{cur_feature},t+{ts+1}}}$"
+                        title = rf"$|Y - \hat{{Y}}|^{{t+{ts+1}}}_{{{cur_feature}}}$"
                         value = np.abs(y_test[i, ..., ts, j] - y_hat[i, ..., ts, j])
                         cmap = "binary"
 
@@ -174,6 +174,10 @@ class BaselineRegressor:
                         ax[j, k].set_title(title)
                         ax[j, k].axis("off")
                         _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
+            plt.tight_layout()
+            if save:
+                name = str(self.__class__).split(".")[-2]
+                plt.savefig(f"../data/analysis/{name}_{i}.png")
             plt.show()
 
     def predict_(self, X_test, y_test):
@@ -316,9 +320,9 @@ class BaselineRegressor:
             t = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             name = str(self.__class__).split(".")[-2]
             path = f"../data/pred/{name}_{t}.npy"
-        
+
         if not os.path.exists(path):
-            with open(path, 'w') as f:
+            with open(path, "w") as f:
                 f.write("")
         np.save(path, y_hat.transpose(0, 1, 2, 4, 3))
 

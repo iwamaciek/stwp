@@ -7,11 +7,11 @@ class Config:
     BATCH_SIZE = 8
     FH = 1
     # AUTOREG_FH = None
-    INPUT_SIZE = 6
+    INPUT_SIZE = 5
     R = 2
-    GRAPH_CELLS = 5
+    GRAPH_CELLS = 9
     SCALER_TYPE = "standard"
-    DATA_PATH = "../../data2019-2021_SMALL.grib"
+    DATA_PATH = "../../data2019-2021_BIG.grib"
     RANDOM_STATE = 42
     INPUT_DIMS = (32, 48)
     OUTPUT_DIMS = (25, 45)

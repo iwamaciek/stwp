@@ -23,4 +23,5 @@ data
 *.svg
 *.pdf
 Untitled.ipynb
+.cdsapirc
 *.npy

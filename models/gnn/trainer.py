@@ -3,6 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import time
 import cartopy.crs as ccrs
+import json
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from models.gnn.processor import NNDataProcessor
@@ -15,9 +16,8 @@ from models.gnn.callbacks import (
 )
 from models.gnn.gnn_module import GNNModule
 from utils.draw_functions import draw_poland
-from datetime import datetime
-
 from utils.trig_encode import trig_decode
+from datetime import datetime, timedelta
 
 
 class Trainer:
@@ -546,3 +546,42 @@ class Trainer:
     def clip_total_cloud_cover(y_hat, idx=2):
         y_hat[..., idx, :] = np.clip(y_hat[..., idx, :], 0, 1)
         return y_hat
+
+    def get_model(self):
+        return self.model
+
+    def predict_to_json(self, X=None, path="../data.json", ts_real=False):
+        if X is None:
+            X = next(iter(self.test_loader))  # batch size should be set to 1 !
+        _, y_hat = self.predict(X.x, X.y, X.edge_index, X.edge_attr, X.pos, X.time)
+        y_hat = y_hat.reshape((self.latitude, self.longitude, self.features, -1))
+        lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
+        lat_span = list(lat_span[:, 0])
+        lon_span = list(lon_span[0, :])
+
+        json_data = {}
+
+        if ts_real:
+            # This always thinks it is 2024, used just for the api
+            prediction_day = trig_decode(X.time[0].item(), X.time[1].item(), 365)
+            prediction_hour = trig_decode(X.time[2].item(), X.time[3].item(), 24)
+            prediction_date = datetime(
+                year=2024, month=1, day=1, hour=prediction_hour
+            ) + timedelta(days=prediction_day - 1)
+
+        for i, lat in enumerate(lat_span):
+            json_data[lat] = {}
+            for j, lon in enumerate(lon_span):
+                json_data[lat][lon] = {}
+                for k, feature in enumerate(self.feature_list):
+                    json_data[lat][lon][feature] = {}
+                    for ts in range(y_hat.shape[-1]):
+                        if ts_real:
+                            t = prediction_date + timedelta(hours=6 * (ts + 1))
+                            t = t.strftime("%Y-%m-%dT%H:%M:%S")
+                        else:
+                            t = ts
+                        json_data[lat][lon][feature][t] = float(y_hat[i, j, k, ts])
+
+        with open(path, "w") as f:
+            json.dump(json_data, f, indent=2, ensure_ascii=False)

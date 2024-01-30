@@ -6,8 +6,16 @@ COPY requirements ./
 
 RUN pip install --no-cache-dir -r requirements
 
+COPY script.sh .
+
+RUN ./script.sh
+
 COPY ./app/ .
 
-EXPOSE 8888
+COPY ./model /model
+
+COPY ./.cdsapirc /root/
+
+ENV TZ=Europe/Warsaw
 
 CMD ["python", "main.py"]

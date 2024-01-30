@@ -18,22 +18,20 @@ class Visualization:
         self.plots_data = {}
         self.feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
 
-
         self.colors = {
-            "simple-linear":'#377eb8',
-            "linear": '#ff7f00',
-            "lgbm": '#4daf4a',
-            "gnn": 'black',
-            "cnn": '#a65628',
+            "simple-linear": "#377eb8",
+            "linear": "#ff7f00",
+            "lgbm": "#4daf4a",
+            "gnn": "black",
+            "cnn": "#a65628",
         }
 
-
         self.baseline_dict = {
-            'lgbm': r'$GB$',
-            'simple-linear': r'$SLR$',
-            'linear': r'$LR$',
-            'gnn': r'$GNN$',
-            'cnn': r'$U-NET$',
+            "lgbm": r"$GB$",
+            "simple-linear": r"$SLR$",
+            "linear": r"$LR$",
+            "gnn": r"$GNN$",
+            "cnn": r"$U-NET$",
         }
 
         self.error_maps = []
@@ -79,8 +77,10 @@ class Visualization:
             table.append(row)
 
         return table
-    
-    def plot_not_normalized_data_sequence(self, for_features=False, one_plot=False, save=None):
+
+    def plot_not_normalized_data_sequence(
+        self, for_features=False, one_plot=False, save=None
+    ):
         if for_features == False:
             # Iterate over each baseline_type and plot the data
             for i, baseline_type in enumerate(self.plots_data.keys()):
@@ -112,12 +112,11 @@ class Visualization:
                 plt.tight_layout()
 
                 if save is not None:
-                    plt.savefig(f'{baseline_type}_{save}.pdf', bbox_inches='tight')
+                    plt.savefig(f"{baseline_type}_{save}.pdf", bbox_inches="tight")
 
                     # Show the plot for each baseline_type
                 plt.show()
 
-                
         elif one_plot == True and for_features == True:
             num_plots = len(self.plots_data)
             num_cols = 2  # Number of columns in the grid
@@ -130,7 +129,7 @@ class Visualization:
             plot_dict = {}
             for feature in self.feature_list:
                 plot_dict[feature] = []
-            
+
             # transform data fromat from features per baseline to baselines per feature
             for i, baseline_type in enumerate(self.plots_data.keys()):
                 for_feature_dict = {}
@@ -140,34 +139,47 @@ class Visualization:
                     for_feature_dict[feature] = []
 
                 if "not_normalized_plot_sequence" in self.plots_data[baseline_type]:
-                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_sequence"]
+                    not_normalized_plot_sequence = self.plots_data[baseline_type][
+                        "not_normalized_plot_sequence"
+                    ]
 
                     for i, feature in enumerate(self.feature_list):
                         for key in not_normalized_plot_sequence.keys():
-                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
-                    
+                            for_feature_dict[feature].append(
+                                list(not_normalized_plot_sequence[key])[i]
+                            )
+
                     for feature in self.feature_list:
                         plot_dict[feature].append(for_feature_dict[feature])
 
             # plot the transformed data
             for j, feature in enumerate(self.feature_list):
                 row = j // num_cols
-                col = j %num_cols
+                col = j % num_cols
                 legend = []
                 for i in range(len(baselines)):
-                    if "not_normalized_plot_sequence" in self.plots_data[baseline_type] and plot_dict[feature][i]:  # Check if not_normalized_plot_sequence is not empty
+                    if (
+                        "not_normalized_plot_sequence" in self.plots_data[baseline_type]
+                        and plot_dict[feature][i]
+                    ):  # Check if not_normalized_plot_sequence is not empty
                         legend.append(self.baseline_dict[baselines[i]])
-                        axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
-                        axes[row, col].set_title(f"Input Sequence Length - {feature}", fontsize=10)
+                        axes[row, col].plot(
+                            list(not_normalized_plot_sequence.keys()),
+                            plot_dict[feature][i],
+                            "-o",
+                            color=self.colors[baselines[i]],
+                        )
+                        axes[row, col].set_title(
+                            f"Input Sequence Length - {feature}", fontsize=10
+                        )
                         axes[row, col].legend(legend, fontsize=8)
                         axes[row, col].set_xlabel("Sequence Length", fontsize=8)
                         axes[row, col].set_ylabel(r"$\mathcal{L}_{RMSE}$", fontsize=8)
-            
+
             if save is not None:
-                    plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
             plt.show()
 
-            
         else:
             # initialize data structures
             baselines = []
@@ -210,13 +222,12 @@ class Visualization:
                 ax.set_ylabel(r"$\mathcal{L}_{RMSE}$")
 
                 if save is not None:
-                    plt.savefig(f'{feature}_{save}.pdf', bbox_inches='tight')
+                    plt.savefig(f"{feature}_{save}.pdf", bbox_inches="tight")
                 plt.show()
 
-                
-
-
-    def plot_not_normalized_data_fh(self, for_features=False, one_plot=False, save=None):
+    def plot_not_normalized_data_fh(
+        self, for_features=False, one_plot=False, save=None
+    ):
         if for_features == False:
             # Iterate over each baseline_type and plot the data
             for i, baseline_type in enumerate(self.plots_data.keys()):
@@ -238,19 +249,16 @@ class Visualization:
                 )
 
                 # Set the title and legend for each plot
-                ax.set_title(
-                    f"Predicted Steps  - {self.baseline_dict[baseline_type]}"
-                )
+                ax.set_title(f"Predicted Steps  - {self.baseline_dict[baseline_type]}")
                 ax.legend(self.feature_list)
                 ax.set_xlabel("Number of Predicted Steps")
                 ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
-                    # Show the plot for each baseline_type
+                # Show the plot for each baseline_type
                 if save is not None:
-                    plt.savefig(f'{baseline_type}_{save}.pdf', bbox_inches='tight')
+                    plt.savefig(f"{baseline_type}_{save}.pdf", bbox_inches="tight")
                 plt.show()
 
-                
         elif one_plot == True and for_features == True:
             num_plots = len(self.plots_data)
             num_cols = 2  # Number of columns in the grid
@@ -263,7 +271,7 @@ class Visualization:
             plot_dict = {}
             for feature in self.feature_list:
                 plot_dict[feature] = []
-            
+
             # transform data fromat from features per baseline to baselines per feature
             for i, baseline_type in enumerate(self.plots_data.keys()):
                 for_feature_dict = {}
@@ -273,14 +281,16 @@ class Visualization:
                     for_feature_dict[feature] = []
 
                 if "not_normalized_plot_fh" in self.plots_data[baseline_type]:
-                    
-                    not_normalized_plot_sequence = self.plots_data[baseline_type]["not_normalized_plot_fh"]
+                    not_normalized_plot_sequence = self.plots_data[baseline_type][
+                        "not_normalized_plot_fh"
+                    ]
                     for i, feature in enumerate(self.feature_list):
-                        
                         for key in not_normalized_plot_sequence.keys():
                             # print(baseline_type)
-                            for_feature_dict[feature].append(list(not_normalized_plot_sequence[key])[i])
-                    
+                            for_feature_dict[feature].append(
+                                list(not_normalized_plot_sequence[key])[i]
+                            )
+
                     for feature in self.feature_list:
                         # print(baseline_type)
                         # print(for_feature_dict[feature])
@@ -292,21 +302,31 @@ class Visualization:
                 col = j % num_cols
                 legend = []
                 for i in range(len(baselines)):
-                    
-                    if "not_normalized_plot_fh" in self.plots_data[baseline_type] and plot_dict[feature][i]:
+                    if (
+                        "not_normalized_plot_fh" in self.plots_data[baseline_type]
+                        and plot_dict[feature][i]
+                    ):
                         legend.append(self.baseline_dict[baselines[i]])
-                        axes[row, col].plot(list(not_normalized_plot_sequence.keys()), plot_dict[feature][i], "-o", color=self.colors[baselines[i]])
-                        axes[row, col].set_title(f"Predicted Steps - {feature}", fontsize=10)
+                        axes[row, col].plot(
+                            list(not_normalized_plot_sequence.keys()),
+                            plot_dict[feature][i],
+                            "-o",
+                            color=self.colors[baselines[i]],
+                        )
+                        axes[row, col].set_title(
+                            f"Predicted Steps - {feature}", fontsize=10
+                        )
                         axes[row, col].legend(legend, fontsize=8)
-                        axes[row, col].set_xlabel("Number of Predicted Steps", fontsize=8)
+                        axes[row, col].set_xlabel(
+                            "Number of Predicted Steps", fontsize=8
+                        )
                         axes[row, col].set_ylabel(r"$\mathcal{L}_{RMSE}$", fontsize=8)
 
             if save is not None:
-                    plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
             plt.show()
 
-            
         else:
             # initialize data structures
             baselines = []
@@ -349,10 +369,8 @@ class Visualization:
                 ax.set_ylabel(r"$\mathcal{L}_{RMSE}$")
 
                 if save is not None:
-                    plt.savefig(f'{feature}_{save}.pdf', bbox_inches='tight')
+                    plt.savefig(f"{feature}_{save}.pdf", bbox_inches="tight")
                 plt.show()
-
-                
 
     def plot_data_sequence(self, one_plot=False, save=None):
         if one_plot:
@@ -366,7 +384,13 @@ class Visualization:
                 sequence_plot_y = self.plots_data[baseline_type]["sequence_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(sequence_plot_x, sequence_plot_y, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
+                ax.plot(
+                    sequence_plot_x,
+                    sequence_plot_y,
+                    "-o",
+                    label=self.baseline_dict[baseline_type],
+                    color=self.colors[baseline_type],
+                )
                 ax.set_xlabel("Sequence Length")
                 ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
@@ -375,12 +399,11 @@ class Visualization:
             ax.legend()
 
             if save is not None:
-                plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
 
-            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -401,7 +424,12 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(sequence_plot_x, sequence_plot_y, "-o", color=self.colors[baseline_type])
+                axes[row, col].plot(
+                    sequence_plot_x,
+                    sequence_plot_y,
+                    "-o",
+                    color=self.colors[baseline_type],
+                )
                 axes[row, col].set_title(
                     self.baseline_dict[baseline_type]
                 )  # Set the title as the baseline_type
@@ -412,12 +440,10 @@ class Visualization:
             plt.tight_layout()
 
             if save is not None:
-                plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
-
-            
 
     def plot_data_sequence_time(self, one_plot=False, save=None):
         if one_plot:
@@ -435,7 +461,11 @@ class Visualization:
 
                     # Plot the data on the single plot
                     ax.plot(
-                        sequence_plot_x, sequence_plot_time, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type]
+                        sequence_plot_x,
+                        sequence_plot_time,
+                        "-o",
+                        label=self.baseline_dict[baseline_type],
+                        color=self.colors[baseline_type],
                     )
 
             # Set the title and legend
@@ -445,12 +475,10 @@ class Visualization:
             ax.set_ylabel("Time [s]")
 
             if save is not None:
-                plt.savefig(f'baselines_{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"baselines_{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
-
-            
 
             # Create a single plot with multiple lines and legend
             fig, ax = plt.subplots(figsize=(10, 8))
@@ -466,7 +494,11 @@ class Visualization:
 
                     # Plot the data on the single plot
                     ax.plot(
-                        sequence_plot_x, sequence_plot_time, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type]
+                        sequence_plot_x,
+                        sequence_plot_time,
+                        "-o",
+                        label=self.baseline_dict[baseline_type],
+                        color=self.colors[baseline_type],
                     )
 
             # Set the title and legend
@@ -475,14 +507,12 @@ class Visualization:
             ax.set_xlabel("Sequence Length")
             ax.set_ylabel("Time [s]")
 
-
             if save is not None:
-                plt.savefig(f'nets_{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"nets_{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
 
-            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -505,7 +535,12 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(sequence_plot_x, sequence_plot_time, "-o", color=self.colors[baseline_type])
+                axes[row, col].plot(
+                    sequence_plot_x,
+                    sequence_plot_time,
+                    "-o",
+                    color=self.colors[baseline_type],
+                )
                 axes[row, col].set_title(
                     self.baseline_dict[baseline_type]
                 )  # Set the title as the baseline_type
@@ -516,12 +551,10 @@ class Visualization:
             plt.tight_layout()
 
             if save is not None:
-                plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
-
-            
 
     def plot_data_fh(self, one_plot=False, save=None):
         if one_plot:
@@ -535,7 +568,13 @@ class Visualization:
                 fh_plot_y = self.plots_data[baseline_type]["fh_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(fh_plot_x, fh_plot_y, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
+                ax.plot(
+                    fh_plot_x,
+                    fh_plot_y,
+                    "-o",
+                    label=self.baseline_dict[baseline_type],
+                    color=self.colors[baseline_type],
+                )
 
             # Set the title and legend
             ax.set_title("Predicted Steps")
@@ -544,12 +583,11 @@ class Visualization:
             ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
             if save is not None:
-                plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
 
-            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -570,7 +608,9 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(fh_plot_x, fh_plot_y, "-o", color=self.colors[baseline_type])
+                axes[row, col].plot(
+                    fh_plot_x, fh_plot_y, "-o", color=self.colors[baseline_type]
+                )
                 axes[row, col].set_title(
                     self.baseline_dict[baseline_type]
                 )  # Set the title as the baseline_type
@@ -581,12 +621,10 @@ class Visualization:
             plt.tight_layout()
 
             if save is not None:
-                plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
-
-            
 
     def plot_months(self, one_plot=False, save=None):
         months = [
@@ -616,9 +654,14 @@ class Visualization:
                 )
                 ind = np.arange(max(month_plot_x))
                 if len(month_plot_y) == 12:
-                    
-                    ax.bar(ind+width*i, month_plot_y, width, label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
-                    i+=1
+                    ax.bar(
+                        ind + width * i,
+                        month_plot_y,
+                        width,
+                        label=self.baseline_dict[baseline_type],
+                        color=self.colors[baseline_type],
+                    )
+                    i += 1
 
             # Set the title and legend
             plt.xticks(
@@ -634,12 +677,9 @@ class Visualization:
                 ind + width * (i - 1) / 2, months
             )  # Adjust the position of x-ticks
 
-
             if save is not None:
-                plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
             plt.show()
-
-            
 
     def plot_data_fh_time(self, one_plot=False, save=None):
         if one_plot:
@@ -654,7 +694,13 @@ class Visualization:
                     fh_plot_time = self.plots_data[baseline_type]["fh_plot_time"]
 
                     # Plot the data on the single plot
-                    ax.plot(fh_plot_x, fh_plot_time, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
+                    ax.plot(
+                        fh_plot_x,
+                        fh_plot_time,
+                        "-o",
+                        label=self.baseline_dict[baseline_type],
+                        color=self.colors[baseline_type],
+                    )
 
             # Set the title and legend
             ax.set_title("Predicted Steps Time (Baselines)")
@@ -662,11 +708,9 @@ class Visualization:
             ax.set_xlabel("Number of Predicted Steps")
             ax.set_ylabel("Time [s]")
             if save is not None:
-                plt.savefig(f'baselines_{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"baselines_{save}.pdf", bbox_inches="tight")
             # Show the plot
             plt.show()
-
-            
 
             fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -678,7 +722,13 @@ class Visualization:
                     fh_plot_time = self.plots_data[baseline_type]["fh_plot_time"]
 
                     # Plot the data on the single plot
-                    ax.plot(fh_plot_x, fh_plot_time, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
+                    ax.plot(
+                        fh_plot_x,
+                        fh_plot_time,
+                        "-o",
+                        label=self.baseline_dict[baseline_type],
+                        color=self.colors[baseline_type],
+                    )
 
             # Set the title and legend
             ax.set_title("Predicted Steps Time (Nets)")
@@ -687,12 +737,11 @@ class Visualization:
             ax.set_ylabel("Time [s]")
 
             if save is not None:
-                plt.savefig(f'nets_{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"nets_{save}.pdf", bbox_inches="tight")
 
             # Show the plot
             plt.show()
 
-            
         else:
             # Create a grid of subplots
             num_plots = len(self.plots_data)
@@ -713,7 +762,9 @@ class Visualization:
                 col = i % num_cols
 
                 # Plot the data on the current subplot
-                axes[row, col].plot(fh_plot_x, fh_plot_time, "-o", color=self.colors[baseline_type])
+                axes[row, col].plot(
+                    fh_plot_x, fh_plot_time, "-o", color=self.colors[baseline_type]
+                )
                 axes[row, col].set_title(
                     self.baseline_dict[baseline_type]
                 )  # Set the title as the baseline_type
@@ -722,11 +773,9 @@ class Visualization:
             # Adjust the layout and spacing of the subplots
             plt.tight_layout()
             if save is not None:
-                plt.savefig(f'{save}.pdf', bbox_inches='tight')
+                plt.savefig(f"{save}.pdf", bbox_inches="tight")
             # Show the plot
             plt.show()
-
-            
 
     def plot_gnn_alpha(self, save=None):
         # Create a single plot with multiple lines and legend
@@ -739,7 +788,13 @@ class Visualization:
                 alpha_plot_y = self.plots_data[baseline_type]["gnn_alpha_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(alpha_plot_x, alpha_plot_y, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
+                ax.plot(
+                    alpha_plot_x,
+                    alpha_plot_y,
+                    "-o",
+                    label=self.baseline_dict[baseline_type],
+                    color=self.colors[baseline_type],
+                )
                 ax.set_xlabel("Alpha")
                 ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
@@ -748,12 +803,10 @@ class Visualization:
         ax.legend()
 
         if save is not None:
-            plt.savefig(f'{save}.pdf', bbox_inches='tight')
+            plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
         # Show the plot
         plt.show()
-
-        
 
     def plot_gnn_layers(self, save=None):
         # Create a single plot with multiple lines and legend
@@ -766,7 +819,13 @@ class Visualization:
                 cell_plot_y = self.plots_data[baseline_type]["gnn_cell_plot_y"]
 
                 # Plot the data on the single plot
-                ax.plot(cell_plot_x, cell_plot_y, "-o", label=self.baseline_dict[baseline_type], color=self.colors[baseline_type])
+                ax.plot(
+                    cell_plot_x,
+                    cell_plot_y,
+                    "-o",
+                    label=self.baseline_dict[baseline_type],
+                    color=self.colors[baseline_type],
+                )
                 ax.set_xlabel("Number of Graph Layers")
                 ax.set_ylabel(r"$\tilde{\mathcal{L}}_{RMSE}$")
 
@@ -775,18 +834,15 @@ class Visualization:
         ax.legend()
 
         if save is not None:
-            plt.savefig(f'{save}.pdf', bbox_inches='tight')
+            plt.savefig(f"{save}.pdf", bbox_inches="tight")
 
         # Show the plot
         plt.show()
-
-        
 
     def plot_error_maps(self):
         for baseline_type in self.plots_data.keys():
             if os.path.exists(f"./{baseline_type}/error_maps.npy"):
                 error_maps = np.load(f"./{baseline_type}/error_maps.npy")
-
 
                 lat_span, lon_span, spatial_limits = DataProcessor.get_spatial_info()
                 spatial = {
@@ -795,11 +851,11 @@ class Visualization:
                     "spatial_limits": spatial_limits,
                 }
                 fig, axs = plt.subplots(
-                len(self.feature_list),
-                # 1,
-                figsize=(10, 12),
-                subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
-                # constrained_layout=True
+                    len(self.feature_list),
+                    # 1,
+                    figsize=(10, 12),
+                    subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
+                    # constrained_layout=True
                 )
                 for j, feature_name in enumerate(self.feature_list):
                     ax = axs[j]
@@ -807,5 +863,6 @@ class Visualization:
                     value = error_maps[j]
                     cmap = "binary"
                     draw_poland(ax, value, title, cmap, **spatial)
-                fig.suptitle(f"{baseline_type} error maps", x=0.7, y=0.95, weight="bold")
-                
+                fig.suptitle(
+                    f"{baseline_type} error maps", x=0.7, y=0.95, weight="bold"
+                )

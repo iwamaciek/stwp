@@ -133,7 +133,6 @@ class DataProcessor:
         feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
 
         if spatial_encoding:
-
             lsm = surface.lsm.to_numpy()
             z = surface.z.to_numpy()
             z = (z - z.mean()) / z.std()
@@ -164,7 +163,6 @@ class DataProcessor:
             spatial_data = None
 
         if temporal_encoding:
-
             dt = surface.time.to_numpy()
             dt = np.fromiter((datetime64_to_datetime(ti) for ti in dt), dtype=datetime)
 
@@ -206,12 +204,12 @@ class DataProcessor:
             X_train, X_val, X_test = (
                 X[:train_samples],
                 X[train_samples : 2 * train_samples],
-                X[-(len(X)-2*train_samples) :],
+                X[-(len(X) - 2 * train_samples) :],
             )
             y_train, y_val, y_test = (
                 y[:train_samples],
                 y[train_samples : 2 * train_samples],
-                y[-(len(X)-2*train_samples) :],
+                y[-(len(X) - 2 * train_samples) :],
             )
             X_train, y_train = shuffle(X_train, y_train, random_state=cfg.RANDOM_STATE)
             X_val, y_val = shuffle(X_val, y_val, random_state=cfg.RANDOM_STATE)

@@ -21,10 +21,7 @@ query_dict = {
         "total_cloud_cover",
         "total_precipitation",
     ],
-    "year": [
-        "2019",
-        "2020",
-        "2021"],
+    "year": ["2019", "2020", "2021"],
     "month": [
         "01",
         "02",

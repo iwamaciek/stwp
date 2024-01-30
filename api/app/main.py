@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from datetime import datetime, timedelta
 import sys
+
 sys.path.append("..")
 from model.utils.get_data import DataImporter
 from model.config import config as cfg
@@ -25,18 +26,26 @@ import matplotlib.patches as patches
 # Function to create new predictions
 def get_current_data():
     global json_data
-    current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
+    current_date = datetime.now() - timedelta(
+        days=7
+    )  # timedelta because new data is unavailable - we use the data from the week before
 
     # This section downloads the data
     previous_day = current_date - timedelta(days=1)
 
     if previous_day.year != current_date.year:
-        dataImporter.query_dict["year"] = [f"{previous_day.year}", f"{current_date.year}"]
+        dataImporter.query_dict["year"] = [
+            f"{previous_day.year}",
+            f"{current_date.year}",
+        ]
     else:
         dataImporter.query_dict["year"] = [f"{current_date.year}"]
 
     if previous_day.month != current_date.month:
-        dataImporter.query_dict["month"] = [f"{previous_day.month}", f"{current_date.month}"]
+        dataImporter.query_dict["month"] = [
+            f"{previous_day.month}",
+            f"{current_date.month}",
+        ]
     else:
         dataImporter.query_dict["month"] = [f"{current_date.month}"]
 
@@ -73,7 +82,12 @@ def get_current_data():
     else:
         raise ValueError(f"Hour is incompatible: {most_recent_hour}")
 
-    current_date = datetime(year=current_date.year, month=current_date.month, day=current_date.day, hour=most_recent_hour)
+    current_date = datetime(
+        year=current_date.year,
+        month=current_date.month,
+        day=current_date.day,
+        hour=most_recent_hour,
+    )
 
     return current_date, json_data
 
@@ -103,6 +117,7 @@ lng_max = float(max(json_data[str(lat_min)].keys()))
 
 # Set the coordinate accuracy
 coord_acc = 0.25
+
 
 # Function to calculate the fractions used for interpolation
 def get_fractions(lat, lng):
@@ -160,12 +175,82 @@ def get_values_by_lat_lng(lat, lng):
     # Create a dictionary of features with their respective values
     # Each feature is a 3D numpy array with dimensions corresponding to latitude, longitude, and time
     features = {
-        "sp": np.array([[[json_data[lat][lng]["sp"][timestamp] for timestamp in json_data[lat][lng]["sp"]] for lng in json_data[lat]] for lat in json_data]),
-        "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1 else 0 if json_data[lat][lng]["tcc"][timestamp] < 0 else 1 for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
-        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
-        "u10": np.array([[[json_data[lat][lng]["u10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["u10"]] for lng in json_data[lat]] for lat in json_data]),
-        "v10": np.array([[[json_data[lat][lng]["v10"][timestamp] * 3.6 for timestamp in json_data[lat][lng]["v10"]] for lng in json_data[lat]] for lat in json_data]),
-        "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
+        "sp": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["sp"][timestamp]
+                        for timestamp in json_data[lat][lng]["sp"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
+        "tcc": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["tcc"][timestamp]
+                        if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1
+                        else 0
+                        if json_data[lat][lng]["tcc"][timestamp] < 0
+                        else 1
+                        for timestamp in json_data[lat][lng]["tcc"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
+        "tp": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["tp"][timestamp]
+                        for timestamp in json_data[lat][lng]["tp"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
+        "u10": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["u10"][timestamp] * 3.6
+                        for timestamp in json_data[lat][lng]["u10"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
+        "v10": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["v10"][timestamp] * 3.6
+                        for timestamp in json_data[lat][lng]["v10"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
+        "t2m": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["t2m"][timestamp]
+                        for timestamp in json_data[lat][lng]["t2m"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
     }
 
     # Initialize the response dictionary with latitude, longitude, and an empty list of timestamps
@@ -175,8 +260,7 @@ def get_values_by_lat_lng(lat, lng):
     for i, timestamp in enumerate(timestamps):
         data = {"timestamp": timestamp, "values": {}}
         for feature in features:
-            value = float(interpolate_value(
-                features[feature][:, :, i], lat, lng))
+            value = float(interpolate_value(features[feature][:, :, i], lat, lng))
             data["values"][feature] = value
         response["timestamps"].append(data)
 
@@ -193,9 +277,50 @@ def create_maps():
 
     # Define the latitude and longitude ranges
     features = {
-        "tcc": np.array([[[json_data[lat][lng]["tcc"][timestamp] if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1 else 0 if json_data[lat][lng]["tcc"][timestamp] < 0 else 1 for timestamp in json_data[lat][lng]["tcc"]] for lng in json_data[lat]] for lat in json_data]),
-        "tp": np.array([[[json_data[lat][lng]["tp"][timestamp] if 0.05 <= json_data[lat][lng]["tp"][timestamp] <= 100 else 0 if json_data[lat][lng]["tp"][timestamp] < 0.05 else 100 for timestamp in json_data[lat][lng]["tp"]] for lng in json_data[lat]] for lat in json_data]),
-        "t2m": np.array([[[json_data[lat][lng]["t2m"][timestamp] for timestamp in json_data[lat][lng]["t2m"]] for lng in json_data[lat]] for lat in json_data]),
+        "tcc": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["tcc"][timestamp]
+                        if 0 <= json_data[lat][lng]["tcc"][timestamp] <= 1
+                        else 0
+                        if json_data[lat][lng]["tcc"][timestamp] < 0
+                        else 1
+                        for timestamp in json_data[lat][lng]["tcc"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
+        "tp": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["tp"][timestamp]
+                        if 0.05 <= json_data[lat][lng]["tp"][timestamp] <= 100
+                        else 0
+                        if json_data[lat][lng]["tp"][timestamp] < 0.05
+                        else 100
+                        for timestamp in json_data[lat][lng]["tp"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
+        "t2m": np.array(
+            [
+                [
+                    [
+                        json_data[lat][lng]["t2m"][timestamp]
+                        for timestamp in json_data[lat][lng]["t2m"]
+                    ]
+                    for lng in json_data[lat]
+                ]
+                for lat in json_data
+            ]
+        ),
     }
 
     # Define the color maps for the different features
@@ -206,36 +331,36 @@ def create_maps():
 
     # Define the ranges for the different features
     ranges = {
-        "tp": [0.1, 0.25, 0.5, 1, 2.5, 5, 7.5, 10, 15, 20, 30, 40,
-               50, 100],
+        "tp": [0.1, 0.25, 0.5, 1, 2.5, 5, 7.5, 10, 15, 20, 30, 40, 50, 100],
         "tcc": np.arange(0.01, 1.01, 0.01),
         "t2m": np.arange(t2m_min - 1, t2m_max + 2, 1),
     }
 
-    custom_colors = [(0.8431372549, 0.91764705882, 0.97647058823),
-                     (0.3137255012989044, 0.8156862854957581,
-                     0.8156862854957581),
-                     (0.0, 1.0, 1.0),
-                     (0.0, 0.8784313797950745, 0.501960813999176),
-                     (0.0, 0.7529411911964417, 0.0),
-                     (0.501960813999176, 0.8784313797950745, 0.0),
-                     (1.0, 1.0, 0.0),
-                     (1.0, 0.6274510025978088, 0.0),
-                     (1.0, 0.0, 0.0),
-                     (1.0, 0.125490203499794, 0.501960813999176),
-                     (0.9411764740943909, 0.250980406999588, 1.0),
-                     (0.501960813999176, 0.125490203499794, 1.0),
-                     (0.250980406999588, 0.250980406999588, 1.0)]
+    custom_colors = [
+        (0.8431372549, 0.91764705882, 0.97647058823),
+        (0.3137255012989044, 0.8156862854957581, 0.8156862854957581),
+        (0.0, 1.0, 1.0),
+        (0.0, 0.8784313797950745, 0.501960813999176),
+        (0.0, 0.7529411911964417, 0.0),
+        (0.501960813999176, 0.8784313797950745, 0.0),
+        (1.0, 1.0, 0.0),
+        (1.0, 0.6274510025978088, 0.0),
+        (1.0, 0.0, 0.0),
+        (1.0, 0.125490203499794, 0.501960813999176),
+        (0.9411764740943909, 0.250980406999588, 1.0),
+        (0.501960813999176, 0.125490203499794, 1.0),
+        (0.250980406999588, 0.250980406999588, 1.0),
+    ]
 
-    labels = {
-        "tp" : "[mm]",
-        "tcc" : "[%]",
-        "t2m" : "[°C]"
-    }
+    labels = {"tp": "[mm]", "tcc": "[%]", "t2m": "[°C]"}
 
     # Get the shape of Poland
-    for country in shpreader.Reader(shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')).records():
-        if country.attributes['NAME_LONG'] == 'Poland':
+    for country in shpreader.Reader(
+        shpreader.natural_earth(
+            resolution="10m", category="cultural", name="admin_0_countries"
+        )
+    ).records():
+        if country.attributes["NAME_LONG"] == "Poland":
             poland_geom = country.geometry
             break
 
@@ -268,7 +393,13 @@ def create_maps():
                 norm = mcolors.BoundaryNorm(ranges["tp"], cmap.N)
 
                 cf = ax.contourf(
-                    lons, lats, data, levels=levels, cmap=cmap, transform=data_crs, norm=norm
+                    lons,
+                    lats,
+                    data,
+                    levels=levels,
+                    cmap=cmap,
+                    transform=data_crs,
+                    norm=norm,
                 )
             else:
                 cmap = plt.colormaps[colors.get(feature_name)]
@@ -277,7 +408,9 @@ def create_maps():
                 )
 
             # Create a mask for the area outside Poland
-            patch = patches.PathPatch(poland_path, transform=ccrs.PlateCarree(), facecolor='none')
+            patch = patches.PathPatch(
+                poland_path, transform=ccrs.PlateCarree(), facecolor="none"
+            )
             ax.add_patch(patch)
             for collection in cf.collections:
                 collection.set_clip_path(patch)
@@ -299,7 +432,7 @@ def create_maps():
 
         # Create a new figure for the colorbar
         fig, ax = plt.subplots(figsize=(24, 3))
-        cbar = plt.colorbar(cf, cax=ax, orientation='horizontal')
+        cbar = plt.colorbar(cf, cax=ax, orientation="horizontal")
 
         # Calculate min and max
         min_val = np.min(ranges[feature_name])
@@ -307,8 +440,7 @@ def create_maps():
 
         # Generate a sequence of numbers from min to max
         if feature_name == "t2m":
-            ticks = np.linspace(min_val, max_val, num=(
-                len(ranges[feature_name])))
+            ticks = np.linspace(min_val, max_val, num=(len(ranges[feature_name])))
         elif feature_name == "tcc":
             ticks = np.linspace(min_val, max_val, num=11)
         else:
@@ -326,10 +458,10 @@ def create_maps():
             ticklabels[-1] = "≥" + str(int(ticks[-1]))
 
         # Set the label
-        cbar.set_label(labels[feature_name], fontsize=32, color='white')
+        cbar.set_label(labels[feature_name], fontsize=32, color="white")
 
         # Set the tick labels
-        cbar.set_ticklabels(ticklabels, fontsize=32, color='white')
+        cbar.set_ticklabels(ticklabels, fontsize=32, color="white")
 
         # Move the plot around
         plt.subplots_adjust(left=0.03, right=0.97, top=0.9, bottom=0.4)
@@ -347,8 +479,10 @@ async def get_weather(
 ):
     global json_data
     global previous_data_gather
-    current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
-    if((current_date - previous_data_gather).total_seconds() > 21600): # 6 hours
+    current_date = datetime.now() - timedelta(
+        days=7
+    )  # timedelta because new data is unavailable - we use the data from the week before
+    if (current_date - previous_data_gather).total_seconds() > 21600:  # 6 hours
         # Get new data - not implemented yet
         previous_data_gather, json_data = get_current_data()
     return get_values_by_lat_lng(latitude, longitude)
@@ -359,8 +493,10 @@ async def get_weather(
 async def get_maps():
     global json_data
     global previous_data_gather
-    current_date = datetime.now() - timedelta(days=7) #timedelta because new data is unavailable - we use the data from the week before
-    if((current_date - previous_data_gather).total_seconds() > 21600): # 6 hours
+    current_date = datetime.now() - timedelta(
+        days=7
+    )  # timedelta because new data is unavailable - we use the data from the week before
+    if (current_date - previous_data_gather).total_seconds() > 21600:  # 6 hours
         # Get new data - not implemented yet
         previous_data_gather, json_data = get_current_data()
         create_maps()
@@ -375,6 +511,7 @@ async def get_maps():
                 archive.write(full_path, arcname=os.path.join("maps", image))
 
     return FileResponse("./maps.zip", media_type="application/zip")
+
 
 @app.get("/info")
 async def get_info():

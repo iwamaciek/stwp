@@ -136,7 +136,6 @@ class DataProcessor:
         feature_list = ["t2m", "sp", "tcc", "u10", "v10", "tp"]
 
         if spatial_encoding:
-
             lsm = surface.lsm.to_numpy()
             z = surface.z.to_numpy()
             z = (z - z.mean()) / z.std()
@@ -167,7 +166,6 @@ class DataProcessor:
             spatial_data = None
 
         if temporal_encoding:
-
             dt = surface.time.to_numpy()
             dt = np.fromiter((datetime64_to_datetime(ti) for ti in dt), dtype=datetime)
 
@@ -191,11 +189,17 @@ class DataProcessor:
         return data, feature_list, temporal_data, spatial_data
 
     @staticmethod
-    def train_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=2, test_shuffle=True):
-        return DataProcessor.train_val_test_split(X, y, split_ratio, split_type, test_shuffle)
+    def train_test_split(
+        X, y, split_ratio=cfg.TRAIN_RATIO, split_type=2, test_shuffle=True
+    ):
+        return DataProcessor.train_val_test_split(
+            X, y, split_ratio, split_type, test_shuffle
+        )
 
     @staticmethod
-    def train_val_test_split(X, y, split_ratio=cfg.TRAIN_RATIO, split_type=1, test_shuffle=True):
+    def train_val_test_split(
+        X, y, split_ratio=cfg.TRAIN_RATIO, split_type=1, test_shuffle=True
+    ):
         """
         split_type=0: X_train (2020), X_val (2021), X_test (2022)
         split_type=1: X_train (2020), X_test (2021)

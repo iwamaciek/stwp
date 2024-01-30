@@ -124,7 +124,9 @@ class Trainer:
         self.ckpt_callback = CkptCallback(self.model)
 
     def load_model(self, path):
-        self.model.load_state_dict(torch.load(path, map_location=torch.device('cpu')))#
+        self.model.load_state_dict(
+            torch.load(path, map_location=torch.device("cpu"))
+        )  #
 
     def train(self, num_epochs=50):
         # gradient_clip = 32
@@ -349,7 +351,7 @@ class Trainer:
             rmse = np.sqrt(mean_squared_error(y_hat_fi, y_fi))
             mae = mean_absolute_error(y_hat_fi, y_fi)
             print(f"RMSE for {feature_name}: {rmse}; MAE for {feature_name}: {mae};")
-    
+
     def return_metric(self, y_hat, y):
         rmse_features = []
         mae_features = []
@@ -385,9 +387,15 @@ class Trainer:
         json_data = {}
 
         prediction_time = X.time
-        prediction_day = trig_decode(prediction_time[0].item(), prediction_time[1].item(), 365)
-        prediction_hour = trig_decode(prediction_time[2].item(), prediction_time[3].item(), 24)
-        prediction_date = datetime(year=2024, month=1, day=1, hour=prediction_hour) + timedelta(days=prediction_day)
+        prediction_day = trig_decode(
+            prediction_time[0].item(), prediction_time[1].item(), 365
+        )
+        prediction_hour = trig_decode(
+            prediction_time[2].item(), prediction_time[3].item(), 24
+        )
+        prediction_date = datetime(
+            year=2024, month=1, day=1, hour=prediction_hour
+        ) + timedelta(days=prediction_day)
 
         for i, lat in enumerate(lat_span):
             json_data[str(lat)] = {}
@@ -396,10 +404,12 @@ class Trainer:
                 for k, feature in enumerate(self.feature_list):
                     json_data[str(lat)][str(lon)][feature] = {}
                     for ts in range(y_hat.shape[-1]):
-                        t = prediction_date + timedelta(hours=6*(ts+1))
-                        json_data[str(lat)][str(lon)][feature][t.strftime("%Y-%m-%dT%H:%M:%S")] = float(y_hat[i, j, k, ts])
+                        t = prediction_date + timedelta(hours=6 * (ts + 1))
+                        json_data[str(lat)][str(lon)][feature][
+                            t.strftime("%Y-%m-%dT%H:%M:%S")
+                        ] = float(y_hat[i, j, k, ts])
 
         with open(path, "w") as f:
             json.dump(json_data, f, indent=2, ensure_ascii=False)
-        
+
         return json_data

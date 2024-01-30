@@ -17,6 +17,4 @@ class Config:
     OUTPUT_DIMS = (25, 45)
 
 
-
-
 config = Config()

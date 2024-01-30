@@ -101,7 +101,6 @@ class NNDataProcessor:
     def fit_transform_scalers(
         self, X_train, X_test, y_train, y_test, scaler_type="standard"
     ):
-
         if scaler_type == "min_max":
             self.scaler = MinMaxScaler()
         elif scaler_type == "standard":
@@ -216,7 +215,7 @@ class NNDataProcessor:
 
         for la in range(self.num_latitudes):
             for lo in range(self.num_longitudes):
-                for (i, j) in indices:
+                for i, j in indices:
                     if (
                         -1 < la + i < self.num_latitudes
                         and -1 < lo + j < self.num_longitudes

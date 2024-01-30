@@ -57,8 +57,6 @@ class Trainer:
         self.lr = lr
         self.gamma = gamma
         self.criterion = torch.nn.L1Loss()
-        # self.criterion = torch.mean(torch.log(torch.cosh((y-y_hat) + 1e-12))) # LogCosh
-        # self.criterion = torch.nn.HuberLoss()
         self.optimizer = None
         self.lr_callback = None
         self.ckpt_callback = None
@@ -111,7 +109,6 @@ class Trainer:
             "num_graph_cells": self.cfg.GRAPH_CELLS,
         }
         self.model = GNNModule(**init_dict).to(self.cfg.DEVICE)
-        # self.model = torch.compile(self.model)
 
     def init_train_details(self):
         self.optimizer = torch.optim.Adam(
@@ -124,7 +121,6 @@ class Trainer:
         self.model.load_state_dict(torch.load(path))
 
     def train(self, num_epochs=50):
-        # gradient_clip = 32
         start = time.time()
 
         val_loss_list = []
@@ -145,8 +141,6 @@ class Trainer:
 
                 loss = self.criterion(y_hat, batch_y)
                 loss.backward()
-
-                # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
 
                 self.optimizer.step()
                 self.optimizer.zero_grad()

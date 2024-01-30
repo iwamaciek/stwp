@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import warnings
 import cartopy.crs as ccrs
 import sys
-from matplotlib.colors import TwoSlopeNorm
+from matplotlib.colors import CenteredNorm
 from models.data_processor import DataProcessor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from models.gnn.processor import NNDataProcessor
@@ -34,7 +34,7 @@ class Analyzer:
             "grad_booster": "GB",
             "simple_linear_regressor": "SLR",
             "linear_regressor": "LR",
-            "unet": "UNET",
+            "unet": "U-NET",
             "trans": "GNN",
             "baseline_regressor": "NAIVE",
             "tigge": "TIGGE",
@@ -126,12 +126,10 @@ class Analyzer:
             if model != "tigge":
                 self.er_dict[model] = np.zeros_like(self.era5[-self.min_length :])
                 for i in range(len(self.feature_list)):
-                    # reshape -> (num_samples* num_latitudes* num_longitudes, )
                     self.er_dict[model][..., i] = (
                         self.era5[-self.min_length :, ..., i]
                         - pred_tensor[-self.min_length :, ..., i]
                     )
-                    # reshape; print avg
 
     def plot_err_corr_matrix(self, save=False):
         fig, axs = plt.subplots(2, 3, figsize=(15, 10))
@@ -305,26 +303,21 @@ class Analyzer:
             figsize=(15, 15),
             subplot_kw={"projection": ccrs.Mercator(central_longitude=40)},
         )
-
         for j, model in enumerate(self.avg_er_dict.keys()):
             ax_title = fig.add_subplot(num_features, num_models, j + 1)
             ax_title.set_title(self.map_dict[model], fontsize=12, y=1.05)
             ax_title.axis("off")
             for i, feature in enumerate(self.feature_list):
                 error_map = self.avg_er_dict[model][..., i]
-                norm = TwoSlopeNorm(
-                    vmin=-max(
-                        map(abs, [min(map(min, error_map)), max(map(max, error_map))])
-                    ),
-                    vcenter=0,
-                    vmax=max(
-                        map(abs, [min(map(min, error_map)), max(map(max, error_map))])
-                    ),
-                )
                 title = rf"$(Y - \hat{{Y}})_{{{feature}}}$"
                 axes[i, j].axis("off")
                 draw_poland(
-                    axes[i, j], error_map, title, plt.cm.coolwarm, norm=norm, **spatial
+                    axes[i, j],
+                    error_map,
+                    title,
+                    plt.cm.coolwarm,
+                    norm=CenteredNorm(),
+                    **spatial,
                 )
         plt.tight_layout(rect=[0, 0, 1, 0.98])
         if save:

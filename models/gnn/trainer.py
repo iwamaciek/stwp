@@ -49,7 +49,9 @@ class Trainer:
         self.subset = subset
 
         self.cfg = cfg
-        self.nn_proc = NNDataProcessor(additional_encodings=additional_encodings, test_shuffle=test_shuffle)
+        self.nn_proc = NNDataProcessor(
+            additional_encodings=additional_encodings, test_shuffle=test_shuffle
+        )
         self.init_data_process()
 
         self.model = None
@@ -60,8 +62,6 @@ class Trainer:
         self.lr = lr
         self.gamma = gamma
         self.criterion = torch.nn.L1Loss()
-        # self.criterion = torch.mean(torch.log(torch.cosh((y-y_hat) + 1e-12))) # LogCosh
-        # self.criterion = torch.nn.HuberLoss()
         self.optimizer = None
         self.lr_callback = None
         self.ckpt_callback = None
@@ -114,7 +114,6 @@ class Trainer:
             "num_graph_cells": self.cfg.GRAPH_CELLS,
         }
         self.model = GNNModule(**init_dict).to(self.cfg.DEVICE)
-        # self.model = torch.compile(self.model)
 
     def init_train_details(self):
         self.optimizer = torch.optim.Adam(
@@ -128,7 +127,6 @@ class Trainer:
         self.model.load_state_dict(torch.load(path))
 
     def train(self, num_epochs=50, verbose=False):
-        # gradient_clip = 32
         start = time.time()
 
         val_loss_list = []
@@ -150,8 +148,6 @@ class Trainer:
                 loss = self.criterion(y_hat, batch_y)
                 loss.backward()
 
-                # nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
-
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
@@ -160,7 +156,7 @@ class Trainer:
             avg_loss = total_loss / (self.subset * self.cfg.BATCH_SIZE)
             train_loss_list.append(avg_loss)
             last_lr = self.optimizer.param_groups[0]["lr"]
-            
+
             if verbose:
                 print(
                     f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_loss:.5f}, lr: {last_lr}"
@@ -241,7 +237,7 @@ class Trainer:
             y_hat = self.clip_total_cloud_cover(y_hat)
         return y, y_hat
 
-    def plot_predictions(self, data_type="test", pretty=False):
+    def plot_predictions(self, data_type="test", pretty=False, save=False):
         if data_type == "train":
             sample = next(iter(self.train_loader))
         elif data_type == "test":
@@ -292,15 +288,15 @@ class Trainer:
                     if pretty:
                         ax = axs[j, k]
                     if k % 3 == 0:
-                        title = rf"$X_{{{feature_name},t+{ts + 1}}}$"
+                        title = rf"$Y^{{t+{ts+1}}}_{{{feature_name}}}$"
                         value = y[i, ..., j, ts]
                         cmap = plt.cm.coolwarm
                     elif k % 3 == 1:
-                        title = rf"$\hat{{X}}_{{{feature_name},t+{ts + 1}}}$"
+                        title = rf"$\hat{{Y}}^{{t+{ts+1}}}_{{{feature_name}}}$"
                         value = y_hat[i, ..., j, ts]
                         cmap = plt.cm.coolwarm
                     else:
-                        title = rf"$|X - \hat{{X}}|_{{{feature_name},t+{ts + 1}}}$"
+                        title = rf"$|Y - \hat{{Y}}|^{{t+{ts+1}}}_{{{feature_name}}}$"
                         value = np.abs(y[i, ..., j, ts] - y_hat[i, ..., j, ts])
                         cmap = "binary"
 
@@ -313,10 +309,12 @@ class Trainer:
                         ax[j, k].set_title(title)
                         ax[j, k].axis("off")
                         _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
-
+        plt.tight_layout()
+        if save:
+            plt.savefig(f"../data/analysis/{self.architecture}_{data_type}.pdf")
         self.calculate_metrics(y_hat, y)
 
-    def plot_error_heatmap(self,  data_type="test", pretty=False):
+    def plot_error_heatmap(self, data_type="test", pretty=False):
         if data_type == "train":
             sample = next(iter(self.train_loader))
         elif data_type == "test":
@@ -374,14 +372,14 @@ class Trainer:
                     if pretty:
                         draw_poland(ax, value, title, cmap, **spatial)
                     else:
-                        pl = ax[j].imshow(
-                            value.reshape(latitude, longitude), cmap=cmap
-                        )
+                        pl = ax[j].imshow(value.reshape(latitude, longitude), cmap=cmap)
                         ax[j, k].set_title(title)
                         ax[j, k].axis("off")
                         _ = fig.colorbar(pl, ax=ax[j, k], fraction=0.15)
 
-    def evaluate(self, data_type="test", verbose=True, inverse_norm=True, begin=None, end=None):
+    def evaluate(
+        self, data_type="test", verbose=True, inverse_norm=True, begin=None, end=None
+    ):
         if data_type == "train":
             loader = self.train_loader
         elif data_type == "test":
@@ -423,7 +421,7 @@ class Trainer:
             y = self.nn_proc.map_latitude_longitude_span(y, flat=False)
         try:
             return self.calculate_metrics(y_hat, y, verbose=verbose), y_hat
-        
+
         except Exception as e:
             print(e)
             return None, y_hat

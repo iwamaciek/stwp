@@ -15,7 +15,13 @@ from datetime import datetime
 
 class Trainer(GNNTrainer):
     def __init__(
-        self, base_units=16, lr=0.001, gamma=0.5, subset=None, spatial_mapping=True, test_shuffle=True
+        self,
+        base_units=16,
+        lr=0.001,
+        gamma=0.5,
+        subset=None,
+        spatial_mapping=True,
+        test_shuffle=True,
     ) -> None:
         self.train_loader = None
         self.val_loader = None
@@ -34,7 +40,9 @@ class Trainer(GNNTrainer):
         self.subset = subset
 
         self.cfg = cfg
-        self.nn_proc = CNNDataProcessor(additional_encodings=True, test_shuffle=test_shuffle)
+        self.nn_proc = CNNDataProcessor(
+            additional_encodings=True, test_shuffle=test_shuffle
+        )
         self.init_data_process()
 
         self.model = None
@@ -100,7 +108,6 @@ class Trainer(GNNTrainer):
                 if self.spatial_mapping:
                     labels = self.nn_proc.map_latitude_longitude_span(labels)
                     outputs = self.nn_proc.map_latitude_longitude_span(outputs)
-
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
@@ -198,7 +205,15 @@ class Trainer(GNNTrainer):
                     yi = y[j, ..., i, :].copy().reshape(-1, 1)
                     yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
 
-                    y[j, ..., i, :] = self.scalers[i].inverse_transform(yi).reshape(yshape)
+        for i in range(self.features):
+            for j in range(y_hat.shape[0]):
+                yi = y[j, ..., i, :].copy().reshape(-1, 1)
+                yhat_i = y_hat[j, ..., i, :].copy().reshape(-1, 1)
+
+                if inverse_norm:
+                    y[j, ..., i, :] = (
+                        self.scalers[i].inverse_transform(yi).reshape(yshape)
+                    )
                     y_hat[j, ..., i, :] = (
                         self.scalers[i].inverse_transform(yhat_i).reshape(yshape)
                     )
